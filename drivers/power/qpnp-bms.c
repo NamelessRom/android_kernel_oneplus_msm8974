@@ -3696,9 +3696,6 @@ assign_data:
 	if (batt_data->iterm_ua >= 0 && dt_data)
 		chip->chg_term_ua = batt_data->iterm_ua;
 
-	if (dt_data)
-		kfree(batt_data);
-
 	if (chip->pc_temp_ocv_lut == NULL) {
 		pr_err("temp ocv lut table has not been loaded\n");
 		if (dt_data) {
