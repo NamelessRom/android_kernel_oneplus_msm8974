@@ -1111,7 +1111,7 @@ int mdss_hw_init(struct mdss_data_type *mdata)
 		}
 	}
 
-	for (i = 0; i < mdata->nmixers_intf; i++) {
+	for (i = 0; i < mdata->ndspp; i++) {
 		offset = mdata->mixer_intf[i].dspp_base +
 				MDSS_MDP_REG_DSPP_HIST_LUT_BASE;
 		for (j = 0; j < ENHIST_LUT_ENTRIES; j++)
@@ -1985,7 +1985,7 @@ ftch_alloc_fail:
 static int mdss_mdp_parse_dt_mixer(struct platform_device *pdev)
 {
 
-	u32 nmixers, ndspp, npingpong;
+	u32 nmixers, npingpong;
 	int rc = 0;
 	u32 *mixer_offsets = NULL, *dspp_offsets = NULL,
 	    *pingpong_offsets = NULL;
@@ -1996,14 +1996,14 @@ static int mdss_mdp_parse_dt_mixer(struct platform_device *pdev)
 				"qcom,mdss-mixer-intf-off");
 	mdata->nmixers_wb = mdss_mdp_parse_dt_prop_len(pdev,
 				"qcom,mdss-mixer-wb-off");
-	ndspp = mdss_mdp_parse_dt_prop_len(pdev,
+	mdata->ndspp = mdss_mdp_parse_dt_prop_len(pdev,
 				"qcom,mdss-dspp-off");
 	npingpong = mdss_mdp_parse_dt_prop_len(pdev,
 				"qcom,mdss-pingpong-off");
 	nmixers = mdata->nmixers_intf + mdata->nmixers_wb;
 
-	if (mdata->nmixers_intf != ndspp) {
-		pr_err("device tree err: unequal no of dspp and intf mixers\n");
+	if (mdata->nmixers_intf < mdata->ndspp) {
+		pr_err("device tree err: no of dspp are greater than intf mixers\n");
 		return -EINVAL;
 	}
 
@@ -2018,7 +2018,7 @@ static int mdss_mdp_parse_dt_mixer(struct platform_device *pdev)
 		return -ENOMEM;
 	}
 
-	dspp_offsets = kzalloc(sizeof(u32) * ndspp, GFP_KERNEL);
+	dspp_offsets = kzalloc(sizeof(u32) * mdata->ndspp, GFP_KERNEL);
 	if (!dspp_offsets) {
 		pr_err("no mem assigned: kzalloc fail\n");
 		rc = -ENOMEM;
@@ -2042,7 +2042,7 @@ static int mdss_mdp_parse_dt_mixer(struct platform_device *pdev)
 		goto parse_done;
 
 	rc = mdss_mdp_parse_dt_handler(pdev, "qcom,mdss-dspp-off",
-		dspp_offsets, ndspp);
+		dspp_offsets, mdata->ndspp);
 	if (rc)
 		goto parse_done;
 
@@ -2075,7 +2075,6 @@ dspp_alloc_fail:
 
 static int mdss_mdp_parse_dt_ctl(struct platform_device *pdev)
 {
-	u32 nwb;
 	int rc = 0;
 	u32 *ctl_offsets = NULL, *wb_offsets = NULL;
 
@@ -2083,11 +2082,11 @@ static int mdss_mdp_parse_dt_ctl(struct platform_device *pdev)
 
 	mdata->nctl = mdss_mdp_parse_dt_prop_len(pdev,
 			"qcom,mdss-ctl-off");
-	nwb =  mdss_mdp_parse_dt_prop_len(pdev,
+	mdata->nwb =  mdss_mdp_parse_dt_prop_len(pdev,
 			"qcom,mdss-wb-off");
 
-	if (mdata->nctl != nwb) {
-		pr_err("device tree err: unequal number of ctl and wb\n");
+	if (mdata->nctl < mdata->nwb) {
+		pr_err("device tree err: number of ctl greater than wb\n");
 		rc = -EINVAL;
 		goto parse_done;
 	}
@@ -2098,7 +2097,7 @@ static int mdss_mdp_parse_dt_ctl(struct platform_device *pdev)
 		return -ENOMEM;
 	}
 
-	wb_offsets = kzalloc(sizeof(u32) * nwb, GFP_KERNEL);
+	wb_offsets = kzalloc(sizeof(u32) * mdata->nwb, GFP_KERNEL);
 	if (!wb_offsets) {
 		pr_err("no more mem for writeback offsets\n");
 		rc = -ENOMEM;
@@ -2111,7 +2110,7 @@ static int mdss_mdp_parse_dt_ctl(struct platform_device *pdev)
 		goto parse_done;
 
 	rc = mdss_mdp_parse_dt_handler(pdev, "qcom,mdss-wb-off",
-		wb_offsets, nwb);
+		wb_offsets, mdata->nwb);
 	if (rc)
 		goto parse_done;
 
