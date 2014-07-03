@@ -1905,7 +1905,14 @@ release_lock:
     spin_unlock_bh( &pAdapter->staInfo_lock );
 done:
    skb->priority = up;
-   queueIndex = hddLinuxUpToAcMap[skb->priority];
+   if(skb->priority < SME_QOS_WMM_UP_MAX)
+         queueIndex = hddLinuxUpToAcMap[skb->priority];
+   else
+   {
+       VOS_TRACE(VOS_MODULE_ID_HDD, WMM_TRACE_LEVEL_INFO,
+                 "%s: up=%d is going beyond max value", __func__, up);
+      queueIndex = hddLinuxUpToAcMap[SME_QOS_WMM_UP_BE];
+   }
 
    return queueIndex;
 }
@@ -1968,7 +1975,14 @@ v_U16_t hdd_wmm_select_queue(struct net_device * dev, struct sk_buff *skb)
    }
 done:
    skb->priority = up;
-   queueIndex = hddLinuxUpToAcMap[skb->priority];
+   if(skb->priority < SME_QOS_WMM_UP_MAX)
+         queueIndex = hddLinuxUpToAcMap[skb->priority];
+   else
+   {
+       VOS_TRACE(VOS_MODULE_ID_HDD, WMM_TRACE_LEVEL_INFO,
+                 "%s: up=%d is going beyond max value", __func__, up);
+      queueIndex = hddLinuxUpToAcMap[SME_QOS_WMM_UP_BE];
+   }
 
    return queueIndex;
 }
