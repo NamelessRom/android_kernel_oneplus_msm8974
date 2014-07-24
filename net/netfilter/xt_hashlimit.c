@@ -103,7 +103,7 @@ struct xt_hashlimit_htable {
 	spinlock_t lock;		/* lock for list_head */
 	u_int32_t rnd;			/* random seed for hash */
 	unsigned int count;		/* number entries in table */
-	struct timer_list timer;	/* timer for gc */
+	struct delayed_work gc_work;
 
 	/* seq_file stuff */
 	struct proc_dir_entry *pde;
@@ -202,7 +202,7 @@ dsthash_free(struct xt_hashlimit_htable *ht, struct dsthash_ent *ent)
 	call_rcu_bh(&ent->rcu, dsthash_free_rcu);
 	ht->count--;
 }
-static void htable_gc(unsigned long htlong);
+static void htable_gc(struct work_struct *work);
 
 static int htable_create(struct net *net, struct xt_hashlimit_mtinfo1 *minfo,
 			 u_int8_t family)
@@ -256,9 +256,9 @@ static int htable_create(struct net *net, struct xt_hashlimit_mtinfo1 *minfo,
 	}
 	hinfo->net = net;
 
-	setup_timer(&hinfo->timer, htable_gc, (unsigned long)hinfo);
-	hinfo->timer.expires = jiffies + msecs_to_jiffies(hinfo->cfg.gc_interval);
-	add_timer(&hinfo->timer);
+	INIT_DELAYED_WORK_DEFERRABLE(&hinfo->gc_work, htable_gc);
+	queue_delayed_work(system_power_efficient_wq, &hinfo->gc_work,
+			   msecs_to_jiffies(hinfo->cfg.gc_interval));
 
 	hlist_add_head(&hinfo->node, &hashlimit_net->htables);
 
@@ -283,29 +283,30 @@ static void htable_selective_cleanup(struct xt_hashlimit_htable *ht,
 {
 	unsigned int i;
 
-	/* lock hash table and iterate over it */
-	spin_lock_bh(&ht->lock);
 	for (i = 0; i < ht->cfg.size; i++) {
 		struct dsthash_ent *dh;
 		struct hlist_node *pos, *n;
+
+		spin_lock_bh(&ht->lock);
 		hlist_for_each_entry_safe(dh, pos, n, &ht->hash[i], node) {
 			if ((*select)(ht, dh))
 				dsthash_free(ht, dh);
 		}
+		spin_unlock_bh(&ht->lock);
+		cond_resched();
 	}
-	spin_unlock_bh(&ht->lock);
 }
 
-/* hash table garbage collector, run by timer */
-static void htable_gc(unsigned long htlong)
+static void htable_gc(struct work_struct *work)
 {
-	struct xt_hashlimit_htable *ht = (struct xt_hashlimit_htable *)htlong;
+	struct xt_hashlimit_htable *ht;
+
+	ht = container_of(work, struct xt_hashlimit_htable, gc_work.work);
 
 	htable_selective_cleanup(ht, select_gc);
 
-	/* re-add the timer accordingly */
-	ht->timer.expires = jiffies + msecs_to_jiffies(ht->cfg.gc_interval);
-	add_timer(&ht->timer);
+	queue_delayed_work(system_power_efficient_wq,
+			   &ht->gc_work, msecs_to_jiffies(ht->cfg.gc_interval));
 }
 
 static void htable_destroy(struct xt_hashlimit_htable *hinfo)
@@ -313,7 +314,7 @@ static void htable_destroy(struct xt_hashlimit_htable *hinfo)
 	struct hashlimit_net *hashlimit_net = hashlimit_pernet(hinfo->net);
 	struct proc_dir_entry *parent;
 
-	del_timer_sync(&hinfo->timer);
+	cancel_delayed_work_sync(&hinfo->gc_work);
 
 	if (hinfo->family == NFPROTO_IPV4)
 		parent = hashlimit_net->ipt_hashlimit;
