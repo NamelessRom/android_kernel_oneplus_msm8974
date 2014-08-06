@@ -6842,6 +6842,9 @@ static int fb_notifier_callback(struct notifier_block *self,
 				if (*blank == FB_BLANK_UNBLANK) {
 					atomic_set(&chip->suspended, 0);//sjc0522 for Find7s temp rising problem
 					/* jingchun.wang@Onlinerd.Driver, 2013/12/27  Add for auto adapt current by software. */
+					if(chip->aicl_current != 0) {
+						qpnp_chg_iusbmax_set(chip, chip->aicl_current);
+					}
 					qpnp_chg_ibatmax_set(chip, chip->max_bat_chg_current);
 				} else if (*blank == FB_BLANK_POWERDOWN) {
 					atomic_set(&chip->suspended, 1);//sjc0522 for Find7s temp rising problem
