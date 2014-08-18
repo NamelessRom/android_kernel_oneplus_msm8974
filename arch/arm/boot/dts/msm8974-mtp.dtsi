@@ -38,6 +38,8 @@
 	};
 
 	i2c@f9924000 {
+/*VENDOR_EDIT*/
+/*  //delete by yubin, oppo, 2013.11.5
 		synaptics@20 {
 			compatible = "synaptics,rmi4";
 			reg = <0x20>;
@@ -53,6 +55,20 @@
 			synaptics,disable-gpios;
 			synaptics,do-lockdown;
 		};
+*/
+/*OPPO yubin 2013-10-10 add begin for tp*/
+		synaptics-rmi-ts@20 {
+			compatible = "synaptics,rmi-ts";
+			reg = <0x20>;
+			interrupt-parent = <&msmgpio>;
+			interrupts = <61 0x8>;
+			synaptics,irq-gpio = <&msmgpio 61 0x00>;
+			synaptics,wakeup-gpio = <&msmgpio 57 0x00>;
+			synaptics,reset-gpio = <&msmgpio 60 0x00>;
+			synaptics,id-gpio = <&msmgpio 62 0x00>;
+			synaptics,id3-gpio = <&msmgpio 46 0x00>;
+		};
+/*OPPO yubin 2013-10-10 add end for tp*/
 
 		atmel_mxt_ts@4a {
 			compatible = "atmel,mxt-ts";
@@ -131,6 +147,7 @@
 					];
 			};
 		};
+
 	};
 
 	gen-vkeys {
