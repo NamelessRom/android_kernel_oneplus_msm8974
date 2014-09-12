@@ -1004,7 +1004,7 @@ static int synaptics_rmi4_f11_abs_report(struct synaptics_rmi4_data *rmi4_data,
 #define SYNA_SMARTCOVER_MIN	0
 #define SYNA_SMARTCOVER_MAN	750
 
-//ÒÔÏÂ¼Ä´æÆ÷×ÜÊÇĞŞ¸Ä£¬Òò´Ë³é³öÀ´¶¨ÒåÔÚÕâÀï
+//ä»¥ä¸‹å¯„å­˜å™¨æ€»æ˜¯ä¿®æ”¹ï¼Œå› æ­¤æŠ½å‡ºæ¥å®šä¹‰åœ¨è¿™é‡Œ
 #define SYNA_ADDR_REPORT_FLAG        0x1b  //report mode register
 #define SYNA_ADDR_GESTURE_FLAG       0x20  //gesture enable register
 #define SYNA_ADDR_GLOVE_FLAG         0x1f  //glove enable register
@@ -2027,7 +2027,7 @@ static ssize_t synaptics_rmi4_baseline_data(char *buf, bool savefile)
 	synaptics_rmi4_i2c_write(syna_ts_data, F54_CMD_BASE_ADDR, &tmp_new, 1);
 	wait_test_cmd_finished();
 
-	//¿¿¿¿¿¿¿¿¿¿¿¿¿¿3¿WORD¿¿¿¿¿¿¿¿¿1000¿¿ Limit ¿¿¿¿¿-1,0.45¿¿¿-1,0.45¿¿¿-0.42,0.02¿
+	//é«˜é˜»æµ‹è¯•é¡¹ï¼Œä¸»è¦çš„æµ‹è¯•æ•°æ®ç”±3ä¸ªWORDç»„æˆï¼Œè¯»å›æ•°æ®é™¤ä»¥1000åï¼Œ Limit åˆ†åˆ«ä¸ºï¼šï¼ˆ-1,0.45ï¼‰ï¼Œï¼ˆ-1,0.45ï¼‰ï¼Œï¼ˆ-0.43,0.02ï¼‰
 	for (i = 0;i < 3; i++) {
 		int iTemp[2];
 		ret = i2c_smbus_read_word_data(client, F54_DATA_BASE_ADDR + 3); // is F54_DATA_BASE_ADDR+3   not F54_DATA_BASE_ADDR+i
@@ -2827,18 +2827,13 @@ static void synaptics_rmi4_f1a_report(struct synaptics_rmi4_data *rmi4_data,
  * fingers detected.
  */
 static void synaptics_rmi4_report_touch(struct synaptics_rmi4_data *rmi4_data,
-		struct synaptics_rmi4_fn *fhandler, const ktime_t timestamp)
+		struct synaptics_rmi4_fn *fhandler)
 {
 	unsigned char touch_count_2d;
 
 	dev_dbg(&rmi4_data->i2c_client->dev,
 			"%s: Function %02x reporting\n",
 			__func__, fhandler->fn_number);
-
-	input_event(rmi4_data->input_dev, EV_SYN, SYN_TIME_SEC,
-			ktime_to_timespec(timestamp).tv_sec);
-	input_event(rmi4_data->input_dev, EV_SYN, SYN_TIME_NSEC,
-			ktime_to_timespec(timestamp).tv_nsec);
 
 	switch (fhandler->fn_number) {
 		case SYNAPTICS_RMI4_F11:
@@ -2887,7 +2882,6 @@ static void synaptics_rmi4_sensor_report(struct synaptics_rmi4_data *rmi4_data)
 	struct synaptics_rmi4_fn *fhandler;
 	struct synaptics_rmi4_exp_fn *exp_fhandler;
 	struct synaptics_rmi4_device_info *rmi;
-	ktime_t timestamp = ktime_get();
 
 	rmi = &(rmi4_data->rmi4_mod_info);
 
@@ -2930,7 +2924,7 @@ static void synaptics_rmi4_sensor_report(struct synaptics_rmi4_data *rmi4_data)
 				if (fhandler->intr_mask &
 						intr[fhandler->intr_reg_num]) {
 					synaptics_rmi4_report_touch(rmi4_data,
-							fhandler, timestamp);
+							fhandler);
 				}
 			}
 		}
