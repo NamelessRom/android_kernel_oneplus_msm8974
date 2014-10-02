@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2013, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012-2014 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -18,25 +18,11 @@
  * TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
  * PERFORMANCE OF THIS SOFTWARE.
  */
+
 /*
- * Copyright (c) 2012, The Linux Foundation. All rights reserved.
- *
- * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
- *
- *
- * Permission to use, copy, modify, and/or distribute this software for
- * any purpose with or without fee is hereby granted, provided that the
- * above copyright notice and this permission notice appear in all
- * copies.
- *
- * THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL
- * WARRANTIES WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED
- * WARRANTIES OF MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE
- * AUTHOR BE LIABLE FOR ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL
- * DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR
- * PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER
- * TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
- * PERFORMANCE OF THIS SOFTWARE.
+ * This file was originally distributed by Qualcomm Atheros, Inc.
+ * under proprietary terms before Copyright ownership was assigned
+ * to the Linux Foundation.
  */
 
 /**=========================================================================
@@ -68,6 +54,13 @@
 /*--------------------------------------------------------------------------
   Preprocessor definitions and constants
   ------------------------------------------------------------------------*/
+/* Protocol specific packet tracking feature */
+#define VOS_PKT_PROT_ETH_TYPE_OFFSET 12
+#define VOS_PKT_PROT_IP_OFFSET       14
+#define VOS_PKT_PROT_IP_HEADER_SIZE  20
+#define VOS_PKT_PROT_DHCP_SRV_PORT   67
+#define VOS_PKT_PROT_DHCP_CLI_PORT   68
+#define VOS_PKT_PROT_EAPOL_ETH_TYPE  0x888E
 
 /*--------------------------------------------------------------------------
   Type declarations
@@ -216,7 +209,7 @@ static void vos_pkti_replenish_raw_pool(void)
       pSkb = alloc_skb(VPKT_SIZE_BUFFER, GFP_ATOMIC);
       if (unlikely(NULL == pSkb))
       {
-         // we have replenished all that we can
+         gpVosPacketContext->rxReplenishFailCount++;
          break;
       }
       skb_reserve(pSkb, VPKT_SIZE_BUFFER);
@@ -375,7 +368,7 @@ VOS_STATUS vos_packet_open( v_VOID_t *pVosContext,
       if (sizeof(vos_pkt_context_t) != vosPacketContextSize)
       {
          VOS_TRACE(VOS_MODULE_ID_VOSS, VOS_TRACE_LEVEL_FATAL,
-                   "VPKT [%d]: invalid vosPacketContextSize, %d vs %d",
+                   "VPKT [%d]: invalid vosPacketContextSize, %zu vs %d",
                    __LINE__, sizeof(vos_pkt_context_t), vosPacketContextSize);
          vosStatus = VOS_STATUS_E_INVAL;
          break;
@@ -718,7 +711,7 @@ VOS_STATUS vos_pkt_get_packet( vos_pkt_t **ppPacket,
    // then we know we are already in a low-resource condition
    if (unlikely(pLowResourceInfo->callback))
    {
-      VOS_TRACE(VOS_MODULE_ID_VOSS, VOS_TRACE_LEVEL_ERROR,
+      VOS_TRACE(VOS_MODULE_ID_VOSS, VOS_TRACE_LEVEL_WARN,
                 "VPKT [%d]: Low resource handler already registered",
                 __LINE__);
       return VOS_STATUS_E_ALREADY;
@@ -912,7 +905,7 @@ VOS_STATUS vos_pkt_wrap_data_packet( vos_pkt_t **ppPacket,
    // then we know we are already in a low-resource condition
    if (unlikely(pLowResourceInfo->callback))
    {
-      VOS_TRACE(VOS_MODULE_ID_VOSS, VOS_TRACE_LEVEL_ERROR,
+      VOS_TRACE(VOS_MODULE_ID_VOSS, VOS_TRACE_LEVEL_WARN,
                 "VPKT [%d]: Low resource handler already registered",
                 __LINE__);
       mutex_unlock(mlock);
@@ -1743,7 +1736,7 @@ VOS_STATUS vos_pkt_extract_data( vos_pkt_t *pPacket,
    }
 
    // copy the data
-   memcpy(pOutputBuffer, &skb->data[pktOffset], len);
+   vos_mem_copy(pOutputBuffer, &skb->data[pktOffset], len);
 
    return VOS_STATUS_SUCCESS;
 }
@@ -1838,7 +1831,7 @@ VOS_STATUS vos_pkt_extract_data_chain( vos_pkt_t *pPacket,
          return VOS_STATUS_E_INVAL;
       }
 
-      memcpy(pOutputBuffer, skb->data, skb->len);
+      vos_mem_copy(pOutputBuffer, skb->data, skb->len);
       pOutputBuffer += skb->len;
 
       pPacket = pPacket->pNext;
@@ -2150,7 +2143,7 @@ VOS_STATUS vos_pkt_push_head( vos_pkt_t *pPacket,
    }
 
    // actually push the data
-   memcpy(skb_push(skb, dataSize), pData, dataSize);
+   vos_mem_copy(skb_push(skb, dataSize), pData, dataSize);
 
    return VOS_STATUS_SUCCESS;
 }
@@ -2389,14 +2382,14 @@ VOS_STATUS vos_pkt_pop_head( vos_pkt_t *pPacket,
    // Make sure there is enough data to pop
    if (unlikely(skb->len < dataSize))
    {
-      VOS_TRACE(VOS_MODULE_ID_VOSS, VOS_TRACE_LEVEL_FATAL,
+      VOS_TRACE(VOS_MODULE_ID_VOSS, VOS_TRACE_LEVEL_WARN,
                 "VPKT [%d]: pop exceeds packet size, len[%d], req[%d]",
                 __LINE__, skb->len, dataSize);
       return VOS_STATUS_E_INVAL;
    }
 
    // copy the data
-   memcpy(pData, skb->data, dataSize);
+   vos_mem_copy(pData, skb->data, dataSize);
    skb_pull(skb, dataSize);
 
    return VOS_STATUS_SUCCESS;
@@ -2542,7 +2535,7 @@ VOS_STATUS vos_pkt_push_tail( vos_pkt_t *pPacket,
    }
 
    // actually push the data
-   memcpy(skb_put(skb, dataSize), pData, dataSize);
+   vos_mem_copy(skb_put(skb, dataSize), pData, dataSize);
 
    return VOS_STATUS_SUCCESS;
 }
@@ -2687,7 +2680,7 @@ VOS_STATUS vos_pkt_pop_tail( vos_pkt_t *pPacket,
    // Make sure there is enough data to pop
    if (unlikely(skb->len < dataSize))
    {
-      VOS_TRACE(VOS_MODULE_ID_VOSS, VOS_TRACE_LEVEL_FATAL,
+      VOS_TRACE(VOS_MODULE_ID_VOSS, VOS_TRACE_LEVEL_WARN,
                 "VPKT [%d]: pop exceeds packet size, len[%d], req[%d]",
                 __LINE__, skb->len, dataSize);
       return VOS_STATUS_E_INVAL;
@@ -2698,7 +2691,7 @@ VOS_STATUS vos_pkt_pop_tail( vos_pkt_t *pPacket,
    skb->len -= dataSize;
 
    // actually push the data
-   memcpy(pData, skb_tail_pointer(skb), dataSize);
+   vos_mem_copy(pData, skb_tail_pointer(skb), dataSize);
 
    return VOS_STATUS_SUCCESS;
 }
@@ -2764,7 +2757,7 @@ VOS_STATUS vos_pkt_trim_tail( vos_pkt_t *pPacket,
    // Make sure there is enough data to pop
    if (unlikely(skb->len < dataSize))
    {
-      VOS_TRACE(VOS_MODULE_ID_VOSS, VOS_TRACE_LEVEL_FATAL,
+      VOS_TRACE(VOS_MODULE_ID_VOSS, VOS_TRACE_LEVEL_WARN,
                 "VPKT [%d]: pop exceeds packet size, len[%d], req[%d]",
                 __LINE__, skb->len, dataSize);
       return VOS_STATUS_E_INVAL;
@@ -3019,6 +3012,57 @@ v_SIZE_t vos_pkt_get_num_of_rx_raw_pkts(void)
 #endif
 }
 
+v_U8_t vos_pkt_get_proto_type
+(
+   void  *pskb,
+   v_U8_t tracking_map
+)
+{
+   v_U8_t     pkt_proto_type = 0;
+   v_U16_t    ether_type;
+   v_U16_t    SPort;
+   v_U16_t    DPort;
+   struct sk_buff *skb = NULL;
+
+
+   if (NULL == pskb)
+   {
+      return pkt_proto_type;
+   }
+   else
+   {
+      skb = (struct sk_buff *)pskb;
+   }
+
+   /* EAPOL Tracking enabled */
+   if (VOS_PKT_PROTO_TYPE_EAPOL & tracking_map)
+   {
+      ether_type = (v_U16_t)(*(v_U16_t *)(skb->data + VOS_PKT_PROT_ETH_TYPE_OFFSET));
+      if (VOS_PKT_PROT_EAPOL_ETH_TYPE == VOS_SWAP_U16(ether_type))
+      {
+         pkt_proto_type |= VOS_PKT_PROTO_TYPE_EAPOL;
+      }
+   }
+
+   /* DHCP Tracking enabled */
+   if (VOS_PKT_PROTO_TYPE_DHCP & tracking_map)
+   {
+      SPort = (v_U16_t)(*(v_U16_t *)(skb->data + VOS_PKT_PROT_IP_OFFSET +
+                                     VOS_PKT_PROT_IP_HEADER_SIZE));
+      DPort = (v_U16_t)(*(v_U16_t *)(skb->data + VOS_PKT_PROT_IP_OFFSET +
+                                     VOS_PKT_PROT_IP_HEADER_SIZE + sizeof(v_U16_t)));
+      if (((VOS_PKT_PROT_DHCP_SRV_PORT == VOS_SWAP_U16(SPort)) &&
+           (VOS_PKT_PROT_DHCP_CLI_PORT == VOS_SWAP_U16(DPort))) ||
+          ((VOS_PKT_PROT_DHCP_CLI_PORT == VOS_SWAP_U16(SPort)) &&
+           (VOS_PKT_PROT_DHCP_SRV_PORT == VOS_SWAP_U16(DPort))))
+      {
+         pkt_proto_type |= VOS_PKT_PROTO_TYPE_DHCP;
+      }
+   }
+
+   /* Protocol type map */
+   return pkt_proto_type;
+}
 #ifdef VOS_PACKET_UNIT_TEST
 #include "vos_packet_test.c"
 #endif
