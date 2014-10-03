@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2013, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012-2014, The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -113,8 +113,10 @@ typedef tANI_U8 tHalIpv4Addr[4];
 #define WLAN_HAL_VERSION_LENGTH  64
 
 #define WLAN_HAL_ROAM_SCAN_MAX_PROBE_SIZE     450
-#define WLAN_HAL_ROAM_SCAN_MAX_CHANNELS       NUM_RF_CHANNELS
-#define WLAN_HAL_ROAM_SCAN_RESERVED_BYTES     57
+/* 80 is actually NUM_RF_CHANNELS_V2, but beyond V2,
+ * this number will be ignored by FW */
+#define WLAN_HAL_ROAM_SCAN_MAX_CHANNELS       80
+#define WLAN_HAL_ROAM_SCAN_RESERVED_BYTES     56
 
 /* Message types for messages exchanged between WDI and HAL */
 typedef enum 
@@ -427,6 +429,14 @@ typedef enum
 
    WLAN_HAL_RATE_UPDATE_IND                 = 229,
 
+   /* Tx Fail for weak link notification */
+   WLAN_HAL_TX_FAIL_MONITOR_IND             = 230,
+   WLAN_HAL_TX_FAIL_IND                     = 231,
+
+   /* Multi-hop IP routing offload */
+   WLAN_HAL_IP_FORWARD_TABLE_UPDATE_IND     = 232,
+
+   WLAN_HAL_AVOID_FREQ_RANGE_IND            = 233,
   WLAN_HAL_MSG_MAX = WLAN_HAL_MSG_TYPE_MAX_ENUM_SIZE
 }tHalHostMsgType;
 
@@ -4030,7 +4040,7 @@ typedef PACKED_PRE struct PACKED_POST
 typedef PACKED_PRE struct PACKED_POST
 {
     tANI_U8   bssid[6];     /* BSSID */
-    tANI_U8   ssid[32];     /* SSID */
+    tANI_U8   ssid[33];     /* SSID */
     tANI_U8   ch;           /* Channel */
     tANI_U8   rssi;         /* RSSI or Level */
     /* Timestamp when Network was found. Used to calculate age based on timestamp in GET_RSP msg header */
@@ -5603,6 +5613,7 @@ typedef PACKED_PRE struct PACKED_POST {
    tANI_U8           nProbes;
    tANI_U16          HomeAwayTime;
    eAniBoolean       MAWCEnabled;
+   tANI_S8           RxSensitivityThreshold;
    tANI_U8           ReservedBytes[WLAN_HAL_ROAM_SCAN_RESERVED_BYTES];
    tRoamNetworkType  ConnectedNetwork;
    tMobilityDomainInfo MDID;
@@ -6898,6 +6909,30 @@ typedef PACKED_PRE struct PACKED_POST
     tHalMsgHeader header;
     tHalRateUpdateParams halRateUpdateParams;
 }  tHalRateUpdateInd, * tpHalRateUpdateInd;
+
+/*---------------------------------------------------------------------------
+ * WLAN_HAL_AVOID_FREQ_RANGE_IND
+ *-------------------------------------------------------------------------*/
+
+#define WLAN_HAL_MAX_AVOID_FREQ_RANGE           4
+
+typedef PACKED_PRE struct PACKED_POST
+{
+   tANI_U32     startFreq;
+   tANI_U32     endFreq;
+}  tHalFreqRange, *tpHalFreqRange;
+
+typedef PACKED_PRE struct PACKED_POST
+{
+   tANI_U32         avoidCnt;
+   tHalFreqRange    avoidRange[WLAN_HAL_MAX_AVOID_FREQ_RANGE];
+}  tHalAvoidFreqRangeIndParams, *tpHalAvoidFreqRangeIndParams;
+
+typedef PACKED_PRE struct PACKED_POST
+{
+   tHalMsgHeader header;
+   tHalAvoidFreqRangeIndParams freqRangeIndParams;
+}  tHalAvoidFreqRangeInd, *tpHalAvoidFreqRangeInd;
 
 /*---------------------------------------------------------------------------
  *-------------------------------------------------------------------------*/
