@@ -1171,6 +1171,18 @@ extern eHalStatus sme_RegisterPowerSaveCheck (
    tANI_BOOLEAN (*checkRoutine) (void *checkContext), void *checkContext);
 
 /* ---------------------------------------------------------------------------
+    \fn sme_Register11dScanDoneCallback
+    \brief  Register a routine of type csrScanCompleteCallback which is
+            called whenever an 11d scan is done
+    \param  hHal - The handle returned by macOpen.
+    \param  callback -  11d scan complete routine to be registered
+    \return eHalStatus
+  ---------------------------------------------------------------------------*/
+extern eHalStatus sme_Register11dScanDoneCallback (
+   tHalHandle hHal,
+   csrScanCompleteCallback);
+
+/* ---------------------------------------------------------------------------
     \fn sme_DeregisterPowerSaveCheck
     \brief  Deregister a power save check routine
     \param  hHal - The handle returned by macOpen.
@@ -1380,6 +1392,21 @@ eHalStatus sme_GetCountryCode(tHalHandle hHal, tANI_U8 *pBuf, tANI_U8 *pbLen);
 eHalStatus sme_SetCountryCode(tHalHandle hHal, tANI_U8 *pCountry, tANI_BOOLEAN *pfRestartNeeded);
 
 /* ---------------------------------------------------------------------------
+
+    \fn sme_InitChannels
+
+    \brief Used to initialize CSR channel lists while driver loading
+
+    \param hHal - global pMac structure
+
+    \return eHalStatus  SUCCESS.
+
+                         FAILURE or RESOURCES  The API finished and failed.
+
+ -------------------------------------------------------------------------------*/
+eHalStatus sme_InitChannels(tHalHandle hHal);
+
+/* ---------------------------------------------------------------------------
     \fn sme_ResetCountryCodeInformation
     \brief this function is to reset the country code current being used back to EEPROM default
     this includes channel list and power setting. This is a synchronous API.
@@ -1485,6 +1512,8 @@ typedef void ( *tSmeChangeCountryCallback)(void *pContext);
 
     \param pCountry New Country Code String
 
+    \param sendRegHint If we want to send reg hint to nl80211
+
     \return eHalStatus  SUCCESS.
 
                          FAILURE or RESOURCES  The API finished and failed.
@@ -1495,7 +1524,8 @@ eHalStatus sme_ChangeCountryCode( tHalHandle hHal,
                                   tANI_U8 *pCountry,
                                   void *pContext,
                                   void* pVosContext,
-                                  tAniBool countryFromUserSpace );
+                                  tAniBool countryFromUserSpace,
+                                  tAniBool sendRegHint);
 
 /* ---------------------------------------------------------------------------
 
@@ -2276,6 +2306,16 @@ eHalStatus sme_p2pGetResultFilter(tHalHandle hHal, tANI_U8 HDDSessionId,
     -------------------------------------------------------------------------*/
 eHalStatus sme_SetMaxTxPower(tHalHandle hHal, tSirMacAddr pBssid, 
                              tSirMacAddr pSelfMacAddress, v_S7_t dB);
+
+/* ---------------------------------------------------------------------------
+    \fn sme_SetMaxTxPowerPerBand
+    \brief  Used to set the Maximum Transmit Power for
+    specific band dynamically. Note: this setting will not persist over reboots
+    \param band
+    \param power to set in dB
+    \- return eHalStatus
+    -------------------------------------------------------------------------*/
+eHalStatus sme_SetMaxTxPowerPerBand(eCsrBand band, v_S7_t db);
 
 /* ---------------------------------------------------------------------------
 
@@ -3149,4 +3189,23 @@ sme_StopBatchScanInd
 );
 
 #endif
+
+eHalStatus sme_RoamDelPMKIDfromCache( tHalHandle hHal, tANI_U8 sessionId, tANI_U8 *pBSSId );
+
+#ifdef FEATURE_WLAN_CH_AVOID
+/* ---------------------------------------------------------------------------
+    \fn sme_AddChAvoidCallback
+    \brief  Used to plug in callback function
+            Which notify channel may not be used with SAP or P2PGO mode.
+            Notification come from FW.
+    \param  hHal
+    \param  pCallbackfn : callback function pointer should be plugged in
+    \- return eHalStatus
+    -------------------------------------------------------------------------*/
+eHalStatus sme_AddChAvoidCallback
+(
+   tHalHandle hHal,
+   void (*pCallbackfn)(void *pAdapter, void *indParam)
+);
+#endif /* FEATURE_WLAN_CH_AVOID */
 #endif //#if !defined( __SME_API_H )

@@ -171,6 +171,11 @@ typedef enum
 /* Check if heartbeat offload is enabled */
 #define IS_IBSS_HEARTBEAT_OFFLOAD_FEATURE_ENABLE ((WDI_getHostWlanFeatCaps(IBSS_HEARTBEAT_OFFLOAD)) & (WDA_getFwWlanFeatCaps(IBSS_HEARTBEAT_OFFLOAD)))
 
+#ifdef FEATURE_WLAN_TDLS
+#define IS_ADVANCE_TDLS_ENABLE ((WDI_getHostWlanFeatCaps(ADVANCE_TDLS)) & (WDA_getFwWlanFeatCaps(ADVANCE_TDLS)))
+#else
+#define IS_ADVANCE_TDLS_ENABLE 0
+#endif
 /*--------------------------------------------------------------------------
   Definitions for Data path APIs
  --------------------------------------------------------------------------*/
@@ -1002,6 +1007,11 @@ tSirRetStatus uMacPostCtrlMsg(void* pSirGlobal, tSirMbMsg* pMb);
 #define WDA_SET_MAX_TX_POWER_REQ       SIR_HAL_SET_MAX_TX_POWER_REQ
 #define WDA_SET_MAX_TX_POWER_RSP       SIR_HAL_SET_MAX_TX_POWER_RSP
 
+#define WDA_SET_MAX_TX_POWER_PER_BAND_REQ \
+        SIR_HAL_SET_MAX_TX_POWER_PER_BAND_REQ
+#define WDA_SET_MAX_TX_POWER_PER_BAND_RSP \
+        SIR_HAL_SET_MAX_TX_POWER_PER_BAND_RSP
+
 #define WDA_SEND_MSG_COMPLETE          SIR_HAL_SEND_MSG_COMPLETE 
 
 /// PE <-> HAL Host Offload message
@@ -1111,7 +1121,8 @@ tSirRetStatus uMacPostCtrlMsg(void* pSirGlobal, tSirMbMsg* pMb);
 
 tSirRetStatus wdaPostCtrlMsg(tpAniSirGlobal pMac, tSirMsgQ *pMsg);
 
-eHalStatus WDA_SetRegDomain(void * clientCtxt, v_REGDOMAIN_t regId);
+eHalStatus WDA_SetRegDomain(void * clientCtxt, v_REGDOMAIN_t regId,
+                                               tAniBool sendRegHint);
 
 #define HAL_USE_BD_RATE2_FOR_MANAGEMENT_FRAME 0x40 // Bit 6 will be used to control BD rate for Management frames
 
@@ -1147,6 +1158,8 @@ eHalStatus WDA_SetRegDomain(void * clientCtxt, v_REGDOMAIN_t regId);
 
 v_BOOL_t WDA_IsHwFrameTxTranslationCapable(v_PVOID_t pVosGCtx, 
                                                       tANI_U8 staIdx);
+
+v_BOOL_t WDA_IsSelfSTA(v_PVOID_t pVosGCtx,tANI_U8 staIdx);
 
 #  define WDA_EnableUapsdAcParams(vosGCtx, staId, uapsdInfo) \
          WDA_SetUapsdAcParamsReq(vosGCtx, staId, uapsdInfo)
@@ -1860,9 +1873,10 @@ tANI_U8 WDA_getFwWlanFeatCaps(tANI_U8 featEnumValue);
   PARAMETERS
     pMac : upper MAC context pointer
     displaySnapshot : Display DXE snapshot option
-    enableStallDetect : Enable stall detect feature
-                        This feature will take effect to data performance
-                        Not integrate till fully verification
+    debugFlags      : Enable stall detect features
+                      defined by WPAL_DeviceDebugFlags
+                      These features may effect
+                      data performance.
 
   RETURN VALUE
     NONE
@@ -1872,7 +1886,7 @@ void WDA_TransportChannelDebug
 (
   tpAniSirGlobal pMac,
   v_BOOL_t       displaySnapshot,
-  v_BOOL_t       toggleStallDetect
+  v_U8_t         debugFlags
 );
 
 /*==========================================================================
