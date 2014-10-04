@@ -56,9 +56,6 @@
   Are listed for each API below.
 
 
-  Copyright (c) 2008 QUALCOMM Incorporated.
-  All Rights Reserved.
-  Qualcomm Confidential and Proprietary
 ===========================================================================*/
 
 /*===========================================================================
@@ -148,6 +145,9 @@
 #include "wlan_qct_tli.h" 
 #include "wlan_qct_tli_ba.h" 
 #include "wlan_qct_tl_hosupport.h"
+#include "vos_types.h"
+#include "vos_trace.h"
+#include "wlan_qct_tl_trace.h"
 #include "tlDebug.h"
 #ifdef FEATURE_WLAN_WAPI
 /*Included to access WDI_RxBdType */
@@ -665,6 +665,7 @@ WLANTL_Start
   TLLOG2(VOS_TRACE( VOS_MODULE_ID_TL, VOS_TRACE_LEVEL_INFO_HIGH,
              "WLAN TL:WLAN TL:WLANTL_Start"));
 
+  tlTraceInit();
   vosStatus = WDA_DS_Register( pvosGCtx, 
                           WLANTL_TxComp, 
                           WLANTL_RxFrames,
@@ -1087,10 +1088,13 @@ void WLANTL_AssocFailed(v_U8_t staId)
   // if the STA exist, the frames will be forwarded
   // and if it doesn't exist, the frames will be flushed
   // in this case we know it won't exist so the DPU index signature values don't matter
+  MTRACE(vos_trace(VOS_MODULE_ID_TL, TRACE_CODE_TL_ASSOC_FAILED,
+                                                staId, 0));
+
   if(!VOS_IS_STATUS_SUCCESS(WLANTL_StartForwarding(staId,0,0)))
   {
     VOS_TRACE(VOS_MODULE_ID_TL, VOS_TRACE_LEVEL_ERROR,
-       " %s fails to start forwarding", __func__);
+       " %s fails to start forwarding (staId %d)", __func__, staId);
   }
 }
   
@@ -1244,6 +1248,13 @@ WLANTL_RegisterSTAClient
   /*------------------------------------------------------------------------
     Register station with TL
    ------------------------------------------------------------------------*/
+  MTRACE(vos_trace(VOS_MODULE_ID_TL, TRACE_CODE_TL_REGISTER_STA_CLIENT,
+                   pwSTADescType->ucSTAId, (unsigned )
+                              (*(pwSTADescType->vSTAMACAddress.bytes+2)<<24 |
+                               *(pwSTADescType->vSTAMACAddress.bytes+3)<<16 |
+                               *(pwSTADescType->vSTAMACAddress.bytes+4)<<8 |
+                               *(pwSTADescType->vSTAMACAddress.bytes+5))));
+
   TLLOG2(VOS_TRACE( VOS_MODULE_ID_TL, VOS_TRACE_LEVEL_INFO_HIGH,
              "WLAN TL:Registering STA Client ID: %d", pwSTADescType->ucSTAId ));
 
@@ -1674,6 +1685,9 @@ WLANTL_ChangeSTAState
              "WLAN TL:Changing state for STA Client ID: %d from %d to %d",
              ucSTAId, pTLCb->atlSTAClients[ucSTAId]->tlState, tlSTAState));
 
+  MTRACE(vos_trace(VOS_MODULE_ID_TL,
+                   TRACE_CODE_TL_STA_STATE, ucSTAId,tlSTAState ));
+
   pTLCb->atlSTAClients[ucSTAId]->tlState = tlSTAState;
 
   return VOS_STATUS_SUCCESS;
@@ -2053,6 +2067,9 @@ WLANTL_STAPktPending
        Just in the case when STA got disconnected shortly after connectection */
     pClientSTA->ucEapolPktPending = 1;
 
+    MTRACE(vos_trace(VOS_MODULE_ID_TL,
+           TRACE_CODE_TL_EAPOL_PKT_PENDING, ucSTAId, ucAc));
+
     VOS_TRACE( VOS_MODULE_ID_TL, VOS_TRACE_LEVEL_INFO_HIGH,
       "WLAN TL:Packet pending indication for STA: %d AC: %d State: %d", 
                ucSTAId, ucAc, pClientSTA->tlState);
@@ -2076,6 +2093,9 @@ WLANTL_STAPktPending
        if (( pTLCb->uResCount >=  WDA_TLI_MIN_RES_DATA ) &&
           ( 0 == pTLCb->ucTxSuspended ))
       {
+        MTRACE(vos_trace(VOS_MODULE_ID_TL, TRACE_CODE_TL_STA_PKT_PENDING,
+                      ucSTAId, pClientSTA->tlState ));
+
         TLLOG2(VOS_TRACE( VOS_MODULE_ID_TL, VOS_TRACE_LEVEL_INFO_HIGH,
               "Issuing Xmit start request to BAL"));
            WDA_DS_StartXmit(pvosGCtx);
@@ -2592,7 +2612,7 @@ WLANTL_GetRssi
   /*------------------------------------------------------------------------
     Copy will not be locked; please read restriction
    ------------------------------------------------------------------------*/
-  if(pTLCb->isBMPS)
+  if(pTLCb->isBMPS || IS_ACTIVEMODE_OFFLOAD_FEATURE_ENABLE)
   {
     *pRssi = pClientSTA->rssiAvgBmps;
     /* Check If RSSI is zero because we are reading rssAvgBmps updated by HAL in 
@@ -3198,7 +3218,7 @@ WLANTL_TxMgmtFrm
   v_U8_t               ucTid,
   WLANTL_TxCompCBType  pfnCompTxFunc,
   v_PVOID_t            pvBDHeader,
-  v_U8_t               ucAckResponse
+  v_U32_t              ucAckResponse
 )
 {
   WLANTL_CbType*  pTLCb = NULL;
@@ -3540,6 +3560,9 @@ WLANTL_SuspendDataTx
   vosMsg.type     = WLANTL_TX_SIG_SUSPEND;
   vosMsg.bodyptr     = (v_PVOID_t)pfnSuspendTx;
 
+  MTRACE(vos_trace(VOS_MODULE_ID_TL, TRACE_CODE_TL_SUSPEND_DATA_TX,
+                    vosMsg.reserved , 0 ));
+
   if(!VOS_IS_STATUS_SUCCESS(vos_tx_mq_serialize( VOS_MQ_ID_TL, &vosMsg)))
   {
     VOS_TRACE(VOS_MODULE_ID_TL, VOS_TRACE_LEVEL_ERROR,
@@ -3608,12 +3631,18 @@ WLANTL_ResumeDataTx
    ------------------------------------------------------------------------*/
   if ( NULL == pucSTAId )
   {
+    MTRACE(vos_trace(VOS_MODULE_ID_TL, TRACE_CODE_TL_RESUME_DATA_TX,
+                      41 , 0 ));
+
     TLLOG2(VOS_TRACE( VOS_MODULE_ID_TL, VOS_TRACE_LEVEL_INFO_HIGH,
               "WLAN TL:General resume requested"));
     vos_atomic_set_U8( &pTLCb->ucTxSuspended, 0);
   }
   else
   {
+    MTRACE(vos_trace(VOS_MODULE_ID_TL, TRACE_CODE_TL_RESUME_DATA_TX,
+                      *pucSTAId , 0 ));
+
     if ( WLANTL_STA_ID_INVALID( *pucSTAId ))
     {
       TLLOGE(VOS_TRACE( VOS_MODULE_ID_TL, VOS_TRACE_LEVEL_ERROR,
@@ -4224,6 +4253,9 @@ WLANTL_GetFrames
         /* Serve EAPOL frame with HI_FLOW_MASK */
         ucSTAId = i;
 
+        MTRACE(vos_trace(VOS_MODULE_ID_TL,
+                   TRACE_CODE_TL_GET_FRAMES_EAPOL, ucSTAId, pTLCb->atlSTAClients[i]->tlState));
+
         for (j = WLANTL_MAX_AC ; j > 0; j--)
         {
           if (0 != pTLCb->atlSTAClients[ucSTAId]->aucACMask[j-1])
@@ -4766,12 +4798,33 @@ WLANTL_CacheSTAFrame
     {
       /*this is the first frame that we are caching */
       pClientSTA->vosBegCachedFrame = vosTempBuff;
+
+      pClientSTA->tlCacheInfo.cacheInitTime = vos_timer_get_system_time();
+      pClientSTA->tlCacheInfo.cacheDoneTime =
+              pClientSTA->tlCacheInfo.cacheInitTime;
+      pClientSTA->tlCacheInfo.cacheSize = 1;
+
+      MTRACE(vos_trace(VOS_MODULE_ID_TL, TRACE_CODE_TL_CACHE_FRAME,
+                       ucSTAId, pClientSTA->tlCacheInfo.cacheSize));
+
     }
     else
     {
       /*this is a subsequent frame that we are caching: chain to the end */
       vos_pkt_chain_packet(pClientSTA->vosEndCachedFrame,
                            vosTempBuff, VOS_TRUE);
+
+      pClientSTA->tlCacheInfo.cacheDoneTime = vos_timer_get_system_time();
+      pClientSTA->tlCacheInfo.cacheSize ++;
+
+      if (pClientSTA->tlCacheInfo.cacheSize % WLANTL_CACHE_TRACE_WATERMARK == 0)
+      {
+        VOS_TRACE(VOS_MODULE_ID_TL, VOS_TRACE_LEVEL_ERROR,
+                  "%s: Cache High watermark for staid:%d (%d)",
+                  __func__,ucSTAId, pClientSTA->tlCacheInfo.cacheSize);
+        MTRACE(vos_trace(VOS_MODULE_ID_TL, TRACE_CODE_TL_CACHE_FRAME,
+                         ucSTAId, pClientSTA->tlCacheInfo.cacheSize));
+      }
     }
     pClientSTA->vosEndCachedFrame = vosTempBuff;
   }/*else new packet*/
@@ -4912,6 +4965,8 @@ WLANTL_ForwardSTAFrames
   {
     TLLOG2(VOS_TRACE( VOS_MODULE_ID_TL, VOS_TRACE_LEVEL_INFO_HIGH,
        "WLAN TL:Station has been deleted for STA %d - flushing cache", ucSTAId));
+    MTRACE(vos_trace(VOS_MODULE_ID_TL, TRACE_CODE_TL_FLUSH_CACHED_FRAMES,
+                     ucSTAId, pClientSTA->tlCacheInfo.cacheSize));
     WLANTL_FlushCachedFrames(pClientSTA->vosBegCachedFrame);
     goto done; 
   }
@@ -4961,6 +5016,8 @@ done:
    -------------------------------------------------------------------------*/
   pClientSTA->vosBegCachedFrame = NULL;
   pClientSTA->vosEndCachedFrame = NULL;
+  pClientSTA->tlCacheInfo.cacheSize = 0;
+  pClientSTA->tlCacheInfo.cacheClearTime = vos_timer_get_system_time();
 
     /*-----------------------------------------------------------------------
     After all the init is complete we can mark the existance flag 
@@ -6027,6 +6084,18 @@ WLANTL_RxCachedFrames
     return VOS_STATUS_E_INVAL;
   }
 
+  pClientSTA = pTLCb->atlSTAClients[ucSTAId];
+
+  if ( NULL == pClientSTA )
+  {
+    TLLOGE(VOS_TRACE( VOS_MODULE_ID_TL, VOS_TRACE_LEVEL_ERROR,
+        "WLAN TL:Client Memory was not allocated on %s", __func__));
+    return VOS_STATUS_E_FAILURE;
+  }
+
+  MTRACE(vos_trace(VOS_MODULE_ID_TL, TRACE_CODE_TL_FORWARD_CACHED_FRAMES,
+                   ucSTAId, 1<<16 | pClientSTA->tlCacheInfo.cacheSize));
+
   /*---------------------------------------------------------------------
     Save the initial buffer - this is the first received buffer
    ---------------------------------------------------------------------*/
@@ -6098,7 +6167,6 @@ WLANTL_RxCachedFrames
       newly added station 
     -------------------------------------------------------------------------*/
     pClientSTA = pTLCb->atlSTAClients[ucSTAId];
-
 
     if ( NULL == pClientSTA )
     {
@@ -6693,6 +6761,52 @@ WLANTL_TxThreadDebugHandler
 }
 
 /*==========================================================================
+  FUNCTION   WLANTL_FatalErrorHandler
+
+  DESCRIPTION
+    Handle Fatal errors detected on the TX path.
+    Currently issues SSR to recover from the error.
+
+  DEPENDENCIES
+    The TL must be initialized before this gets called.
+
+  PARAMETERS
+
+    IN
+    pvosGCtx:       pointer to the global vos context; a handle to TL's
+                    or WDA's control block can be extracted from its context
+
+  RETURN VALUE      None
+
+  SIDE EFFECTS
+
+============================================================================*/
+v_VOID_t
+WLANTL_FatalErrorHandler
+(
+ v_PVOID_t *pVosContext
+)
+{
+
+   TLLOGE(VOS_TRACE( VOS_MODULE_ID_TL, VOS_TRACE_LEVEL_FATAL,
+        "WLAN TL: %s Enter ", __func__));
+
+   if ( NULL == pVosContext )
+   {
+        TLLOGE(VOS_TRACE(VOS_MODULE_ID_TL, VOS_TRACE_LEVEL_ERROR,
+                        "%s: Global VoS Context or TL Context are NULL",
+                        __func__));
+        return;
+   }
+
+   /*
+    * Issue SSR. vos_wlanRestart has tight checks to make sure that
+    * we do not send an FIQ if previous FIQ is not processed
+    */
+   vos_wlanRestart();
+}
+
+/*==========================================================================
   FUNCTION   WLANTL_TLDebugMessage
 
   DESCRIPTION
@@ -6737,6 +6851,48 @@ WLANTL_TLDebugMessage
    return;
 }
 
+/*==========================================================================
+  FUNCTION   WLANTL_FatalError
+
+  DESCRIPTION
+    Fatal error reported in TX path, post an event to TX Thread for further
+    handling
+
+  DEPENDENCIES
+    The TL must be initialized before this gets called.
+
+  PARAMETERS
+
+    VOID
+
+  RETURN VALUE      None
+
+  SIDE EFFECTS
+
+============================================================================*/
+
+v_VOID_t
+WLANTL_FatalError
+(
+ v_VOID_t
+)
+{
+   vos_msg_t vosMsg;
+   VOS_STATUS status;
+
+   vosMsg.reserved = 0;
+   vosMsg.bodyptr  = NULL;
+   vosMsg.type     = WLANTL_TX_FATAL_ERROR;
+
+   status = vos_tx_mq_serialize( VOS_MODULE_ID_TL, &vosMsg);
+   if(status != VOS_STATUS_SUCCESS)
+   {
+       TLLOGE(VOS_TRACE(VOS_MODULE_ID_TL, VOS_TRACE_LEVEL_ERROR,
+                        "%s: TX Msg Posting Failed with status: %d",
+                        __func__,status));
+   }
+   return;
+}
 /*============================================================================
                            TL STATE MACHINE
 ============================================================================*/
@@ -6792,7 +6948,7 @@ WLANTL_STATxConn
    v_U8_t               extraHeadSpace = 0;
    v_U8_t               ucWDSEnabled = 0;
    v_U8_t               ucAC, ucACMask, i; 
-   v_U8_t               txFlag = HAL_TX_NO_ENCRYPTION_MASK;
+   v_U32_t              txFlag = HAL_TX_NO_ENCRYPTION_MASK;
   /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
 
   /*------------------------------------------------------------------------
@@ -7168,7 +7324,7 @@ WLANTL_STATxAuth
    v_U8_t                extraHeadSpace = 0;
    WLANTL_STAClientType *pStaClient = NULL;
    v_U8_t                ucWDSEnabled = 0;
-   v_U8_t                ucTxFlag   = 0; 
+   v_U32_t               ucTxFlag   = 0;
    v_U8_t                ucACMask, i; 
   /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
 
@@ -7490,6 +7646,11 @@ WLANTL_STATxAuth
     ucTxFlag = ucTxFlag | HAL_TDLS_PEER_STA_MASK;
   }
 #endif /* FEATURE_WLAN_TDLS */
+  if( tlMetaInfo.ucIsArp )
+  {
+    /*Send ARP at lowest Phy rate and through WQ5 */
+    ucTxFlag |= HAL_USE_BD_RATE_MASK;
+  }
 
   vosStatus = (VOS_STATUS)WDA_DS_BuildTxPacketInfo( pvosGCtx, 
                      vosDataBuff , &vDestMacAddr,
@@ -7791,6 +7952,8 @@ WLANTL_STARxConn
 #endif /* FEATURE_WLAN_WAPI */
     else /* Frame is an EAPOL frame or a WAI frame*/  
     {
+      MTRACE(vos_trace(VOS_MODULE_ID_TL,
+                   TRACE_CODE_TL_RX_CONN_EAPOL, ucSTAId, usEtherType ));
 
       VOS_TRACE( VOS_MODULE_ID_TL, VOS_TRACE_LEVEL_INFO,
                  "WLAN TL:RX Frame  EAPOL EtherType %d - processing", usEtherType);
@@ -7808,7 +7971,7 @@ WLANTL_STARxConn
 
         if ( VOS_STATUS_SUCCESS != vosStatus ) 
         {
-          TLLOGE(VOS_TRACE( VOS_MODULE_ID_TL, VOS_TRACE_LEVEL_ERROR,
+          TLLOGE(VOS_TRACE( VOS_MODULE_ID_TL, VOS_TRACE_LEVEL_WARN,
             "WLAN TL:Failed to translate from 802.11 to 802.3 - dropping"));
           /* Drop packet */
           vos_pkt_return_packet(vosDataBuff);
@@ -8269,7 +8432,7 @@ WLANTL_STARxAuth
 
       if ( VOS_STATUS_SUCCESS != vosStatus )
       {
-        TLLOGE(VOS_TRACE( VOS_MODULE_ID_TL, VOS_TRACE_LEVEL_ERROR,
+        TLLOGE(VOS_TRACE( VOS_MODULE_ID_TL, VOS_TRACE_LEVEL_WARN,
                "WLAN TL:Failed to translate from 802.11 to 802.3 - dropping"));
         /* Drop packet */
         vos_pkt_return_packet(vosDataBuff);
@@ -8822,6 +8985,10 @@ WLANTL_TxProcessMsg
       the DXE Dump*/
     WLANTL_TxThreadDebugHandler(pvosGCtx);
     WDA_TransportChannelDebug(NULL, VOS_TRUE, VOS_FALSE);
+    break;
+
+  case WLANTL_TX_FATAL_ERROR:
+    WLANTL_FatalErrorHandler(pvosGCtx);
     break;
 
   default:
@@ -9705,7 +9872,7 @@ WLANTL_Translate80211To8023Header
 
     if ( VOS_STATUS_SUCCESS != vosStatus )
     {
-       TLLOGE(VOS_TRACE( VOS_MODULE_ID_TL, VOS_TRACE_LEVEL_ERROR,
+       TLLOGE(VOS_TRACE( VOS_MODULE_ID_TL, VOS_TRACE_LEVEL_WARN,
                   "WLAN TL: Failed to pop LLC header from packet %d",
                   vosStatus));
 
@@ -11437,7 +11604,7 @@ VOS_STATUS WLANTL_GetStatistics
   }
 
   statistics = &pClientSTA->trafficStatistics;
-  memcpy(statBuffer, statistics, sizeof(WLANTL_TRANSFER_STA_TYPE));
+  vos_mem_copy(statBuffer, statistics, sizeof(WLANTL_TRANSFER_STA_TYPE));
 
   return status;
 }

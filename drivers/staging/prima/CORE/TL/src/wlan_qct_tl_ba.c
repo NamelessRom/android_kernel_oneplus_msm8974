@@ -55,11 +55,6 @@
   DEPENDENCIES: 
 
   Are listed for each API below. 
-  
-  
-  Copyright (c) 2008 QUALCOMM Incorporated.
-  All Rights Reserved.
-  Qualcomm Confidential and Proprietary
 ===========================================================================*/
 
 /*===========================================================================
@@ -90,6 +85,9 @@
 #include "wlan_qct_tli.h" 
 #include "wlan_qct_tli_ba.h" 
 #include "wlan_qct_hal.h" 
+#include "wlan_qct_tl_trace.h"
+#include "vos_trace.h"
+#include "vos_types.h"
 #include "vos_list.h"
 #include "vos_lock.h"
 #include "tlDebug.h"
@@ -149,6 +147,7 @@ v_VOID_t WLANTL_ReorderingAgingTimerExpierCB
    vos_pkt_t                   *pCurrent;
    vos_pkt_t                   *pNext;
    v_S15_t                      seq;
+   v_U32_t                      cIndex;
    /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
    if(NULL == timerUdata)
@@ -210,6 +209,9 @@ v_VOID_t WLANTL_ReorderingAgingTimerExpierCB
 
    opCode      = WLANTL_OPCODE_FWDALL_DROPCUR;
    vosDataBuff = NULL;
+
+   MTRACE(vos_trace(VOS_MODULE_ID_TL, TRACE_CODE_TL_REORDER_TIMER_EXP_CB,
+                      ucSTAID , opCode ));
 
 
    TLLOGE(VOS_TRACE(VOS_MODULE_ID_TL, VOS_TRACE_LEVEL_INFO,"BA timeout with %d pending frames, curIdx %d", ReorderInfo->pendingFramesCount, ReorderInfo->ucCIndex));
@@ -292,8 +294,10 @@ v_VOID_t WLANTL_ReorderingAgingTimerExpierCB
        } 
    }
 
+   cIndex = ReorderInfo->ucCIndex;
    status = WLANTL_ChainFrontPkts(fwIdx, opCode, 
                                   &vosDataBuff, ReorderInfo, NULL);
+   ReorderInfo->ucCIndex = cIndex;
    if(!VOS_IS_STATUS_SUCCESS(status))
    {
       TLLOGE(VOS_TRACE(VOS_MODULE_ID_TL, VOS_TRACE_LEVEL_ERROR,"Make packet chain fail with Qed frames %d", status));
@@ -816,6 +820,9 @@ WLANTL_BaSessionDel
   reOrderInfo->sessionID = 0;
   reOrderInfo->LastSN = 0;
 
+  MTRACE(vos_trace(VOS_MODULE_ID_TL, TRACE_CODE_TL_BA_SESSION_DEL,
+                      ucSTAId, ucTid ));
+
   TLLOG2(VOS_TRACE( VOS_MODULE_ID_TL, VOS_TRACE_LEVEL_INFO_HIGH,
              "WLAN TL: BA session deleted for STA: %d TID: %d",
              ucSTAId, ucTid));
@@ -975,7 +982,7 @@ WLANTL_AMSDUProcess
       return VOS_STATUS_SUCCESS; /*Not a transport error*/ 
     }
     pClientSTA->ucMPDUHeaderLen = ucMPDUHLen;
-    memcpy(pClientSTA->aucMPDUHeader, MPDUHeaderAMSDUHeader, ucMPDUHLen);
+    vos_mem_copy(pClientSTA->aucMPDUHeader, MPDUHeaderAMSDUHeader, ucMPDUHLen);
     /* AMSDU header stored to handle garbage data within next frame */
   }
   else
@@ -1015,7 +1022,7 @@ WLANTL_AMSDUProcess
   }
 
   /* Find Padding and remove */
-  memcpy(&subFrameLength, MPDUHeaderAMSDUHeader + ucMPDUHLen + WLANTL_AMSDU_SUBFRAME_LEN_OFFSET, sizeof(v_U16_t));
+  vos_mem_copy(&subFrameLength, MPDUHeaderAMSDUHeader + ucMPDUHLen + WLANTL_AMSDU_SUBFRAME_LEN_OFFSET, sizeof(v_U16_t));
   subFrameLength = vos_be16_to_cpu(subFrameLength);
   paddingSize = usMPDULen - ucMPDUHLen - subFrameLength - TL_AMSDU_SUBFRM_HEADER_LEN;
 
@@ -1252,6 +1259,7 @@ VOS_STATUS WLANTL_MSDUReorder
                }
                return status;
             }
+            currentReorderInfo->ucCIndex = ucFwdIdx;
             *vosDataBuff = vosPktIdx;
          }
          break;
@@ -1606,10 +1614,13 @@ VOS_STATUS WLANTL_MSDUReorder
     *    stop the timer
     * 2) if there are packets queued and the timer is not running:
     *    start the timer
+    * 3) if timer is running and no pending frame:
+    *    stop the timer
     */
    timerState = vos_timer_getCurrentState(&currentReorderInfo->agingTimer);
    if ((VOS_TIMER_STATE_RUNNING == timerState) &&
-       (ucCIndexOrig != currentReorderInfo->ucCIndex))
+       ((ucCIndexOrig != currentReorderInfo->ucCIndex) ||
+        (0 == currentReorderInfo->pendingFramesCount)))
    {
       TLLOG4(VOS_TRACE(VOS_MODULE_ID_TL, VOS_TRACE_LEVEL_INFO_LOW,"HOLE filled, Pending Frames Count %d",
                  currentReorderInfo->pendingFramesCount));
@@ -1717,7 +1728,10 @@ VOS_STATUS WLANTL_QueueCurrent
                *vosDataBuff));
    if(NULL != pwBaReorder->reorderBuffer->arrayBuffer[ucSlotIndex])
    {
-      TLLOGE(VOS_TRACE(VOS_MODULE_ID_TL, VOS_TRACE_LEVEL_ERROR,"One Cycle rounded, lost many frames already, not in Q %d\n",
+      MTRACE(vos_trace(VOS_MODULE_ID_TL, TRACE_CODE_TL_QUEUE_CURRENT,
+                      pwBaReorder->sessionID , pwBaReorder->pendingFramesCount ));
+
+      TLLOGE(VOS_TRACE(VOS_MODULE_ID_TL, VOS_TRACE_LEVEL_ERROR,"One Cycle rounded, lost many frames already, not in Q %d",
                   pwBaReorder->pendingFramesCount));
       return VOS_STATUS_E_RESOURCES;
    }

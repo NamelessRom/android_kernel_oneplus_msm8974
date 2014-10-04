@@ -290,14 +290,11 @@ void csrScanStopTimers(tpAniSirGlobal pMac);
 tANI_BOOLEAN csrScanRemoveNotRoamingScanCommand(tpAniSirGlobal pMac);
 //To remove fresh scan commands from the pending queue
 tANI_BOOLEAN csrScanRemoveFreshScanCommand(tpAniSirGlobal pMac, tANI_U8 sessionId);
-eHalStatus csrScanAbortMacScan(tpAniSirGlobal pMac);
+eHalStatus csrScanAbortMacScan(tpAniSirGlobal pMac, eCsrAbortReason reason);
 void csrRemoveCmdFromPendingList(tpAniSirGlobal pMac, tDblLinkList *pList, 
                                               eSmeCommandType commandType );
 eHalStatus csrScanAbortMacScanNotForConnect(tpAniSirGlobal pMac);
 eHalStatus csrScanGetScanChannelInfo(tpAniSirGlobal pMac);
-eHalStatus csrScanAbortScanForSSID(tpAniSirGlobal pMac, tANI_U32 sessionId);
-void csrRemoveScanForSSIDFromPendingList(tpAniSirGlobal pMac, tDblLinkList *pList, tANI_U32 sessionId);
-
 //To age out scan results base. tSmeGetScanChnRsp is a pointer returned by LIM that
 //has the information regarding scanned channels.
 //The logic is that whenever CSR add a BSS to scan result, it set the age count to
@@ -489,6 +486,14 @@ eHalStatus csrScanGetResult(tpAniSirGlobal, tCsrScanResultFilter *pFilter, tScan
     \return eHalStatus     
   -------------------------------------------------------------------------------*/
 eHalStatus csrScanFlushResult(tpAniSirGlobal);
+/* ---------------------------------------------------------------------------
+ *  \fn csrScanFilterResults
+ *  \brief Filter scan results based on valid channel list.
+ *  \return eHalStatus
+ *-------------------------------------------------------------------------------
+ */
+eHalStatus csrScanFilterResults(tpAniSirGlobal pMac);
+
 eHalStatus csrScanFlushSelectiveResult(tpAniSirGlobal, v_BOOL_t flushP2P);
 /* ---------------------------------------------------------------------------
     \fn csrScanBGScanGetParam
@@ -994,8 +999,11 @@ eHalStatus csrSetTxPower(tpAniSirGlobal pMac, v_U8_t sessionId, v_U8_t mW);
 eHalStatus csrScanCreateEntryInScanCache(tpAniSirGlobal pMac, tANI_U32 sessionId,
                                          tCsrBssid bssid, tANI_U8 channel);
 
-eHalStatus csrUpdateChannelList(tCsrScanStruct *pScan);
+eHalStatus csrUpdateChannelList(tpAniSirGlobal pMac);
 eHalStatus csrRoamDelPMKIDfromCache( tpAniSirGlobal pMac, tANI_U32 sessionId,
                                  tANI_U8 *pBSSId );
+tANI_BOOLEAN csrElectedCountryInfo(tpAniSirGlobal pMac);
+void csrAddVoteForCountryInfo(tpAniSirGlobal pMac, tANI_U8 *pCountryCode);
+void csrClearVotesForCountryInfo(tpAniSirGlobal pMac);
 #endif
 

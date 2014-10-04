@@ -100,7 +100,9 @@
 /*----------------------------------------------------------------------------
  *  External declarations for global context
  * -------------------------------------------------------------------------*/
-
+#ifdef FEATURE_WLAN_CH_AVOID
+extern safeChannelType safeChannels[];
+#endif /* FEATURE_WLAN_CH_AVOID */
 /*----------------------------------------------------------------------------
  * Static Variable Definitions
  * -------------------------------------------------------------------------*/
@@ -513,7 +515,12 @@ sapSignalHDDevent
     /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
 
     /* Format the Start BSS Complete event to return... */
-    VOS_ASSERT(sapContext->pfnSapEventCallback);
+    if (NULL == sapContext->pfnSapEventCallback)
+    {
+         VOS_TRACE( VOS_MODULE_ID_SAP, VOS_TRACE_LEVEL_ERROR, "%s: HDD Event"
+                " callaback invalid", __func__);
+        return VOS_STATUS_E_INVAL;
+    }
 
     switch (sapHddevent)
     {
@@ -856,7 +863,7 @@ sapFsm
              else if (msg == eSAP_MAC_START_FAILS)
              {
                  /*Transition from STARTING to DISCONNECTED (both without substates)*/
-                 VOS_TRACE( VOS_MODULE_ID_SAP, VOS_TRACE_LEVEL_INFO_HIGH, "In %s, from state %s => %s",
+                 VOS_TRACE( VOS_MODULE_ID_SAP, VOS_TRACE_LEVEL_ERROR, "In %s, from state %s => %s",
                             __func__, "eSAP_STARTING", "eSAP_DISCONNECTED");
 
                  /*Action code for transition */
@@ -1130,6 +1137,14 @@ sapSortMacList(v_MACADDR_t *macList, v_U8_t size)
     v_MACADDR_t temp;
     v_SINT_t nRes = -1;
 
+    if ((NULL == macList) || (size >= MAX_ACL_MAC_ADDRESS))
+    {
+        VOS_TRACE( VOS_MODULE_ID_SAP, VOS_TRACE_LEVEL_INFO_HIGH,
+                      "In %s, either buffer is NULL or size = %d is more."
+                      ,__func__, size);
+        return;
+    }
+
     for(outer = 0; outer < size; outer++)
     {
         for(inner = 0; inner < size - 1; inner++)
@@ -1188,6 +1203,15 @@ sapAddMacToACL(v_MACADDR_t *macList, v_U8_t *size, v_U8_t *peerMac)
     v_SINT_t nRes = -1;
     int i;
     VOS_TRACE( VOS_MODULE_ID_SAP, VOS_TRACE_LEVEL_INFO_HIGH,"add acl entered");
+
+    if ((NULL == macList) || (*size == 0) || (*size >= MAX_ACL_MAC_ADDRESS))
+    {
+        VOS_TRACE( VOS_MODULE_ID_SAP, VOS_TRACE_LEVEL_INFO_HIGH,
+                    "In %s, either buffer is NULL or size %d is incorrect."
+                    , __func__, *size);
+        return;
+    }
+
     for (i=((*size)-1); i>=0; i--)
     {
         nRes = vos_mem_compare2(&macList[i], peerMac, sizeof(v_MACADDR_t));
@@ -1216,7 +1240,13 @@ sapRemoveMacFromACL(v_MACADDR_t *macList, v_U8_t *size, v_U8_t index)
     /* return if the list passed is empty. Ideally this should never happen since this funcn is always
        called after sapSearchMacList to get the index of the mac addr to be removed and this will
        only get called if the search is successful. Still no harm in having the check */
-    if (macList==NULL) return;
+    if ((macList==NULL) || (*size == 0) || (*size > MAX_ACL_MAC_ADDRESS))
+    {
+        VOS_TRACE( VOS_MODULE_ID_SAP, VOS_TRACE_LEVEL_INFO_HIGH,
+                    "In %s, either buffer is NULL or size %d is incorrect."
+                    , __func__, *size);
+        return;
+    }
     for (i=index; i<((*size)-1); i++)
     {
         /* Move mac addresses starting from "index" passed one index up to delete the void
@@ -1234,7 +1264,15 @@ void sapPrintACL(v_MACADDR_t *macList, v_U8_t size)
     int i;
     v_BYTE_t *macArray;
     VOS_TRACE( VOS_MODULE_ID_SAP, VOS_TRACE_LEVEL_INFO_HIGH,"print acl entered");
-    if (size==0) return;
+
+    if ((NULL == macList) || (size == 0) || (size >= MAX_ACL_MAC_ADDRESS))
+    {
+        VOS_TRACE( VOS_MODULE_ID_SAP, VOS_TRACE_LEVEL_INFO_HIGH,
+                    "In %s, either buffer is NULL or size %d is incorrect."
+                    , __func__, size);
+        return;
+    }
+
     for (i=0; i<size; i++)
     {
         macArray = (macList+i)->bytes;
@@ -1303,6 +1341,10 @@ static VOS_STATUS sapGetChannelList(ptSapContext sapContext,
     v_U8_t bandEndChannel ;
     v_U32_t enableLTECoex;
     tHalHandle hHal = VOS_GET_HAL_CB(sapContext->pvosGCtx);
+#ifdef FEATURE_WLAN_CH_AVOID
+    v_U8_t i;
+#endif
+
 
     if (NULL == hHal)
     {
@@ -1383,8 +1425,25 @@ static VOS_STATUS sapGetChannelList(ptSapContext sapContext,
         {
             if( regChannels[loopCount].enabled )
             {
-                list[channelCount] = rfChannels[loopCount].channelNum;
-                channelCount++;
+#ifdef FEATURE_WLAN_CH_AVOID
+                for( i = 0; i < NUM_20MHZ_RF_CHANNELS; i++ )
+                {
+                    if( (safeChannels[i].channelNumber ==
+                                rfChannels[loopCount].channelNum) )
+                    {
+                        /* Check if channel is safe */
+                        if(VOS_TRUE == safeChannels[i].isSafe)
+                        {
+#endif
+                            list[channelCount] =
+                                     rfChannels[loopCount].channelNum;
+                            channelCount++;
+#ifdef FEATURE_WLAN_CH_AVOID
+                        }
+                        break;
+                    }
+                }
+#endif
             }
         }
     }

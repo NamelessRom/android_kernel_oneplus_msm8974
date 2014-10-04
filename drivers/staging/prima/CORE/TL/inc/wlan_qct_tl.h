@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2013, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012-2014, The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -51,17 +51,6 @@
 DESCRIPTION
   This file contains the external API exposed by the wlan transport layer
   module.
-<<<<<<< HEAD:CORE/TL/inc/wlan_qct_tl.h
-  
-      
-  Copyright (c) 2008 QUALCOMM Incorporated. All Rights Reserved.
-  Qualcomm Confidential and Proprietary
-=======
-
-
-  Copyright (c) 2008 Qualcomm Technologies, Inc. All Rights Reserved.
-  Qualcomm Technologies Confidential and Proprietary
->>>>>>> 326d6cf... wlan: remove obsolete ANI_CHIPSET_VOLANS featurization:prima/CORE/TL/inc/wlan_qct_tl.h
 ===========================================================================*/
 
 
@@ -430,6 +419,8 @@ typedef struct
 
   /* STA has more packets to send */
   v_BOOL_t  bMorePackets;
+  /* notifying TL if this is an ARP frame or not */
+  v_U8_t    ucIsArp;
 }WLANTL_MetaInfoType;
 
 /*---------------------------------------------------------------------------
@@ -1751,7 +1742,7 @@ WLANTL_TxMgmtFrm
   v_U8_t               tid,
   WLANTL_TxCompCBType  pfnCompTxFunc,
   v_PVOID_t            voosBDHeader,
-  v_U8_t               ucAckResponse
+  v_U32_t              ucAckResponse
 );
 
 
@@ -2969,6 +2960,31 @@ v_VOID_t
 WLANTL_TLDebugMessage
 (
   v_BOOL_t displaySnapshot
+);
+
+/*==========================================================================
+  FUNCTION   WLANTL_FatalError
+
+  DESCRIPTION
+    Fatal error reported in TX path, post an event to TX Thread for further
+    handling
+
+  DEPENDENCIES
+    The TL must be initialized before this gets called.
+
+  PARAMETERS
+
+    VOID
+
+  RETURN VALUE      None
+
+  SIDE EFFECTS
+
+============================================================================*/
+v_VOID_t
+WLANTL_FatalError
+(
+ v_VOID_t
 );
 
 #endif /* #ifndef WLAN_QCT_WLANTL_H */

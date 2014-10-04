@@ -251,7 +251,12 @@ tSirRetStatus limSendSwitchChnlParams(tpAniSirGlobal pMac,
 #endif
     vos_mem_copy(  pChnlParams->bssId, pSessionEntry->bssId, sizeof(tSirMacAddr) );
     pChnlParams->peSessionId = peSessionId;
-    
+
+    if (LIM_SWITCH_CHANNEL_CSA == pSessionEntry->channelChangeCSA )
+    {
+        pChnlParams->channelSwitchSrc =  eHAL_CHANNEL_SWITCH_SOURCE_CSA;
+        pSessionEntry->channelChangeCSA = 0;
+    }
     //we need to defer the message until we get the response back from WDA.
     SET_LIM_PROCESS_DEFD_MESGS(pMac, false);
     msgQ.type = WDA_CHNL_SWITCH_REQ;
@@ -268,6 +273,8 @@ tSirRetStatus limSendSwitchChnlParams(tpAniSirGlobal pMac,
         pChnlParams->secondaryChannelOffset, pChnlParams->channelNumber, pChnlParams->localPowerConstraint);)
 #endif
     MTRACE(macTraceMsgTx(pMac, peSessionId, msgQ.type));
+    limLog(pMac,LOG1,"SessionId:%d WDA_CHNL_SWITCH_REQ for SSID:%s",peSessionId,
+            pSessionEntry->ssId.ssId);
     if( eSIR_SUCCESS != (retCode = wdaPostCtrlMsg( pMac, &msgQ )))
     {
         vos_mem_free(pChnlParams);
