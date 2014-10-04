@@ -447,7 +447,11 @@ v_BOOL_t sapChanSelInit(tHalHandle halHandle, tSapChSelSpectInfo *pSpectInfoPara
 #endif /* FEATURE_WLAN_CH_AVOID */
 
         if(*pChans == 14 ) //OFDM rates are not supported on channel 14
+        {
+            pChans++;
+            pSpectCh++;
             continue;
+        }
 #ifdef FEATURE_WLAN_CH_AVOID
         if (VOS_TRUE == chSafe)
         {
@@ -461,10 +465,10 @@ v_BOOL_t sapChanSelInit(tHalHandle halHandle, tSapChSelSpectInfo *pSpectInfoPara
            pSpectCh->rssiAgr = SOFTAP_MIN_RSSI;
            // Initialise 20MHz for all the Channels
            pSpectCh->channelWidth = SOFTAP_HT20_CHANNELWIDTH;
-           pSpectCh++;
 #ifdef FEATURE_WLAN_CH_AVOID
         }
 #endif /* FEATURE_WLAN_CH_AVOID */
+        pSpectCh++;
         pChans++;
     }
     return eSAP_TRUE;
@@ -547,6 +551,13 @@ void sapInterferenceRssiCount(tSapSpectChInfo *pSpectCh)
 {
     tSapSpectChInfo *pExtSpectCh = NULL;
     v_S31_t rssi;
+
+    if (NULL == pSpectCh)
+    {
+        VOS_TRACE( VOS_MODULE_ID_SAP, VOS_TRACE_LEVEL_ERROR,
+                   "%s: pSpectCh is NULL", __func__);
+        return;
+    }
 
     switch(pSpectCh->chNum)
     {
@@ -1361,7 +1372,7 @@ void sapComputeSpectWeight( tSapChSelSpectInfo* pSpectInfoParams,
             else
                 channel_id = pScanResult->BssDescriptor.channelId;
 
-            if (channel_id == pSpectCh->chNum) {
+            if (pSpectCh && (channel_id == pSpectCh->chNum)) {
                 if (pSpectCh->rssiAgr < pScanResult->BssDescriptor.rssi)
                     pSpectCh->rssiAgr = pScanResult->BssDescriptor.rssi;
 
@@ -1780,6 +1791,11 @@ v_U8_t sapSelectChannel(tHalHandle halHandle, ptSapContext pSapCtx,  tScanResult
         if((startChannelNum <= pSpectInfoParams->pSpectCh[count].chNum)&&
           ( endChannelNum >= pSpectInfoParams->pSpectCh[count].chNum))
         {
+            if (NV_CHANNEL_ENABLE !=
+                    vos_nv_getChannelEnabledState(pSpectInfoParams->pSpectCh[count].chNum))
+            {
+                continue; //skip this channel, continue to next channel
+            }
             if(bestChNum == 0)
             {
                 bestChNum = (v_U8_t)pSpectInfoParams->pSpectCh[count].chNum;

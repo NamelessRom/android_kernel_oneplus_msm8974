@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2013, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2011-2014 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -63,6 +63,19 @@
 #include "vos_status.h"
 #include "wlan_nv.h"
 #include "wlan_nv2.h"
+
+/* Maximum number of channels per country can be ignored */
+#define MAX_CHANNELS_IGNORE 10
+#define MAX_COUNTRY_IGNORE 5
+
+typedef struct sCsrIgnoreChannels
+{
+   tANI_U8 countryCode[NV_FIELD_COUNTRY_CODE_SIZE];
+   tANI_U16 channelList[MAX_CHANNELS_IGNORE];
+   tANI_U16 channelCount;
+}tCsrIgnoreChannels;
+
+extern tCsrIgnoreChannels countryIgnoreList[];
 
 /*--------------------------------------------------------------------------
   Preprocessor definitions and constants
@@ -131,7 +144,6 @@ ADD_VNV_ITEM( VNV_TABLE_VIRTUAL_RATE, 1, 4, VNV_TABLE_VIRTUAL_RATE_I ) \
  * to esp_dpp.h where the WLAN_PROVISION_DATA is present.
  */
 #define CLPC_PROVISION_DATA L"WLAN_CLPC.PROVISION"
-
 /*--------------------------------------------------------------------------
   Type declarations
   ------------------------------------------------------------------------*/
@@ -224,6 +236,8 @@ typedef v_U8_t v_MAC_ADDRESS_t[VOS_MAC_ADDRESS_LEN];
 /*-------------------------------------------------------------------------
   Function declarations and documenation
   ------------------------------------------------------------------------*/
+
+const char * voss_DomainIdtoString(const v_U8_t domainIdCurrent);
 /**------------------------------------------------------------------------
 
   \brief vos_nv_init() - initialize the NV module
@@ -746,5 +760,29 @@ eNvVersionType vos_nv_getNvVersion
 (
    void
 );
+
+
+/**------------------------------------------------------------------------
+  \brief vos_chan_to_freq -
+  \param   - input channel number to know channel frequency
+  \return Channel frequency
+  \sa
+  -------------------------------------------------------------------------*/
+v_U16_t vos_chan_to_freq(v_U8_t chanNum);
+
+/**------------------------------------------------------------------------
+  \brief vos_is_nv_country_non_zero -
+  \param   NONE
+  \return Success if default Country is Non-Zero
+  \sa
+  -------------------------------------------------------------------------*/
+
+v_BOOL_t vos_is_nv_country_non_zero
+(
+   void
+);
+
+int vos_update_nv_table_from_wiphy_band(void *hdd_ctx,
+                                         void *wiphy,v_U8_t nBandCapability);
 
 #endif // __VOS_NVITEM_H

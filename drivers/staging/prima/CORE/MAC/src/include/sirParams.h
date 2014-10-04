@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2013, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012-2014, The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -39,19 +39,6 @@
  * PERFORMANCE OF THIS SOFTWARE.
  */
 
-/*
- * Airgo Networks, Inc proprietary. All rights reserved.
- * This file sirParams.h contains the common parameter definitions, which
- * are not dependent on threadX API. These can be used by all Firmware
- * modules.
- *
- * Author:      Sandesh Goel
- * Date:        04/13/2002
- * History:-
- * Date            Modified by    Modification Information
- * --------------------------------------------------------------------
- */
-
 #ifndef __SIRPARAMS_H
 #define __SIRPARAMS_H
 
@@ -63,7 +50,7 @@
 #define SIR_MAX_NUM_CHANNELS    64
 #define SIR_MAX_NUM_STA_IN_IBSS 16
 #define SIR_MAX_NUM_STA_IN_BSS  256
-#define SIR_CCX_MAX_MEAS_IE_REQS   8
+#define SIR_ESE_MAX_MEAS_IE_REQS   8
 
 typedef enum
 {
@@ -107,6 +94,24 @@ typedef enum {
 
 #ifdef FEATURE_WLAN_BATCH_SCAN
    BATCH_SCAN = 30,
+#endif
+   FW_IN_TX_PATH          = 31,
+   EXTENDED_NSOFFLOAD_SLOT = 32,
+   CH_SWITCH_V1           = 33,
+   HT40_OBSS_SCAN         = 34,
+   UPDATE_CHANNEL_LIST    = 35,
+   WLAN_MCADDR_FLT        = 36,
+   WLAN_CH144             = 37,
+#ifdef FEATURE_WLAN_TDLS
+   TDLS_SCAN_COEXISTENCE  = 39,
+#endif
+#ifdef WLAN_FEATURE_LINK_LAYER_STATS
+   LINK_LAYER_STATS_MEAS  = 40,
+#endif
+
+   MU_MIMO                = 41,
+#ifdef WLAN_FEATURE_EXTSCAN
+   EXTENDED_SCAN          = 42,
 #endif
 
    //MAX_FEATURE_SUPPORTED = 128
@@ -156,6 +161,13 @@ typedef struct sSirMsgQ
      */
     void *bodyptr;
     tANI_U32 bodyval;
+
+    /*
+     * Some messages provide a callback function.  The function signature
+     * must be agreed upon between the two entities exchanging the message
+     */
+    void *callback;
+
 } tSirMsgQ, *tpSirMsgQ;
 
 /// Mailbox Message Structure Define
@@ -548,7 +560,7 @@ typedef struct sSirMbMsgP2p
 #define SIR_HAL_GTK_OFFLOAD_GETINFO_RSP    (SIR_HAL_ITC_MSG_TYPES_BEGIN + 183)
 #endif //WLAN_FEATURE_GTK_OFFLOAD
 
-#ifdef FEATURE_WLAN_CCX
+#ifdef FEATURE_WLAN_ESE
 #define SIR_HAL_TSM_STATS_REQ              (SIR_HAL_ITC_MSG_TYPES_BEGIN + 184)
 #define SIR_HAL_TSM_STATS_RSP              (SIR_HAL_ITC_MSG_TYPES_BEGIN + 185)
 #endif
@@ -611,14 +623,66 @@ typedef struct sSirMbMsgP2p
 #define SIR_HAL_STOP_BATCH_SCAN_IND        (SIR_HAL_ITC_MSG_TYPES_BEGIN + 212)
 #define SIR_HAL_TRIGGER_BATCH_SCAN_RESULT_IND (SIR_HAL_ITC_MSG_TYPES_BEGIN + 213)
 #endif
-
+#define SIR_HAL_RATE_UPDATE_IND            (SIR_HAL_ITC_MSG_TYPES_BEGIN + 217)
 
 #define SIR_HAL_SET_MAX_TX_POWER_PER_BAND_REQ \
         (SIR_HAL_ITC_MSG_TYPES_BEGIN + 214)
 #define SIR_HAL_SET_MAX_TX_POWER_PER_BAND_RSP \
         (SIR_HAL_ITC_MSG_TYPES_BEGIN + 215)
 
-#define SIR_HAL_MSG_TYPES_END              (SIR_HAL_ITC_MSG_TYPES_BEGIN + 0xFF)
+#ifdef FEATURE_CESIUM_PROPRIETARY
+#define SIR_HAL_TX_FAIL_MONITOR_IND         (SIR_HAL_ITC_MSG_TYPES_BEGIN + 226)
+#endif /* FEATURE_CESIUM_PROPRIETARY */
+
+/* OBSS Scan start Indication to FW*/
+#define SIR_HAL_HT40_OBSS_SCAN_IND      (SIR_HAL_ITC_MSG_TYPES_BEGIN +227)
+/* OBSS Scan stop Indication to FW*/
+#define SIR_HAL_HT40_OBSS_STOP_SCAN_IND (SIR_HAL_ITC_MSG_TYPES_BEGIN +228)
+
+#define SIR_HAL_BCN_MISS_RATE_REQ         (SIR_HAL_ITC_MSG_TYPES_BEGIN + 229)
+
+#ifdef WLAN_FEATURE_LINK_LAYER_STATS
+#define SIR_HAL_LL_STATS_CLEAR_REQ      (SIR_HAL_ITC_MSG_TYPES_BEGIN + 232)
+#define SIR_HAL_LL_STATS_SET_REQ        (SIR_HAL_ITC_MSG_TYPES_BEGIN + 233)
+#define SIR_HAL_LL_STATS_GET_REQ        (SIR_HAL_ITC_MSG_TYPES_BEGIN + 234)
+#define SIR_HAL_LL_STATS_RESULTS_RSP    (SIR_HAL_ITC_MSG_TYPES_BEGIN + 235)
+#endif
+
+#ifdef WLAN_FEATURE_EXTSCAN
+#define SIR_HAL_EXTSCAN_GET_CAPABILITIES_REQ   (SIR_HAL_ITC_MSG_TYPES_BEGIN + 236)
+#define SIR_HAL_EXTSCAN_GET_CAPABILITIES_RSP   (SIR_HAL_ITC_MSG_TYPES_BEGIN + 237)
+#define SIR_HAL_EXTSCAN_START_REQ              (SIR_HAL_ITC_MSG_TYPES_BEGIN + 238)
+#define SIR_HAL_EXTSCAN_START_RSP              (SIR_HAL_ITC_MSG_TYPES_BEGIN + 239)
+#define SIR_HAL_EXTSCAN_STOP_REQ               (SIR_HAL_ITC_MSG_TYPES_BEGIN + 240)
+#define SIR_HAL_EXTSCAN_STOP_RSP               (SIR_HAL_ITC_MSG_TYPES_BEGIN + 241)
+#define SIR_HAL_EXTSCAN_SET_BSS_HOTLIST_REQ    (SIR_HAL_ITC_MSG_TYPES_BEGIN + 242)
+#define SIR_HAL_EXTSCAN_SET_BSS_HOTLIST_RSP    (SIR_HAL_ITC_MSG_TYPES_BEGIN + 243)
+#define SIR_HAL_EXTSCAN_RESET_BSS_HOTLIST_REQ  (SIR_HAL_ITC_MSG_TYPES_BEGIN + 244)
+#define SIR_HAL_EXTSCAN_RESET_BSS_HOTLIST_RSP  (SIR_HAL_ITC_MSG_TYPES_BEGIN + 245)
+#define SIR_HAL_EXTSCAN_SET_SIGNF_RSSI_CHANGE_REQ   (SIR_HAL_ITC_MSG_TYPES_BEGIN + 246)
+#define SIR_HAL_EXTSCAN_SET_SIGNF_RSSI_CHANGE_RSP   (SIR_HAL_ITC_MSG_TYPES_BEGIN + 247)
+#define SIR_HAL_EXTSCAN_RESET_SIGNF_RSSI_CHANGE_REQ (SIR_HAL_ITC_MSG_TYPES_BEGIN + 248)
+#define SIR_HAL_EXTSCAN_RESET_SIGNF_RSSI_CHANGE_RSP (SIR_HAL_ITC_MSG_TYPES_BEGIN + 249)
+#define SIR_HAL_EXTSCAN_GET_CACHED_RESULTS_REQ (SIR_HAL_ITC_MSG_TYPES_BEGIN + 250)
+#define SIR_HAL_EXTSCAN_GET_CACHED_RESULTS_RSP (SIR_HAL_ITC_MSG_TYPES_BEGIN + 251)
+
+#define SIR_HAL_EXTSCAN_PROGRESS_IND           (SIR_HAL_ITC_MSG_TYPES_BEGIN + 252)
+#define SIR_HAL_EXTSCAN_SCAN_AVAILABLE_IND     (SIR_HAL_ITC_MSG_TYPES_BEGIN + 253)
+#define SIR_HAL_EXTSCAN_SCAN_RESULT_IND        (SIR_HAL_ITC_MSG_TYPES_BEGIN + 254)
+#define SIR_HAL_EXTSCAN_HOTLIST_MATCH_IND      (SIR_HAL_ITC_MSG_TYPES_BEGIN + 255)
+#define SIR_HAL_EXTSCAN_SIGNF_WIFI_CHANGE_IND  (SIR_HAL_ITC_MSG_TYPES_BEGIN + 256)
+#define SIR_HAL_EXTSCAN_FULL_SCAN_RESULT_IND   (SIR_HAL_ITC_MSG_TYPES_BEGIN + 257)
+
+#endif /* WLAN_FEATURE_EXTSCAN */
+
+#ifdef FEATURE_WLAN_TDLS
+/// PE <-> HAL TDLS messages
+// tdlsoffchan
+#define SIR_HAL_TDLS_CHAN_SWITCH_REQ          (SIR_HAL_ITC_MSG_TYPES_BEGIN + 258)
+#define SIR_HAL_TDLS_CHAN_SWITCH_REQ_RSP      (SIR_HAL_ITC_MSG_TYPES_BEGIN + 259)
+#endif
+
+#define SIR_HAL_MSG_TYPES_END              (SIR_HAL_MSG_TYPES_BEGIN + 0x1FF)
 // CFG message types
 #define SIR_CFG_MSG_TYPES_BEGIN        (SIR_CFG_MODULE_ID << 8)
 #define SIR_CFG_ITC_MSG_TYPES_BEGIN    (SIR_CFG_MSG_TYPES_BEGIN+0xB0)
@@ -685,7 +749,6 @@ typedef struct sSirMbMsgP2p
 #define SIR_LIM_PROBE_HB_FAILURE_TIMEOUT (SIR_LIM_TIMEOUT_MSG_START + 0xB)
 #define SIR_LIM_ADDTS_RSP_TIMEOUT        (SIR_LIM_TIMEOUT_MSG_START + 0xC)
 #define SIR_LIM_LINK_TEST_DURATION_TIMEOUT (SIR_LIM_TIMEOUT_MSG_START + 0x13)
-#define SIR_LIM_HASH_MISS_THRES_TIMEOUT  (SIR_LIM_TIMEOUT_MSG_START + 0x16)
 #define SIR_LIM_CNF_WAIT_TIMEOUT         (SIR_LIM_TIMEOUT_MSG_START + 0x17)
 #define SIR_LIM_KEEPALIVE_TIMEOUT        (SIR_LIM_TIMEOUT_MSG_START + 0x18)
 #define SIR_LIM_UPDATE_OLBC_CACHEL_TIMEOUT (SIR_LIM_TIMEOUT_MSG_START + 0x19)
@@ -707,7 +770,7 @@ typedef struct sSirMbMsgP2p
 #define SIR_LIM_BEACON_GEN_IND          (SIR_LIM_TIMEOUT_MSG_START + 0x23)
 #define SIR_LIM_PERIODIC_PROBE_REQ_TIMEOUT    (SIR_LIM_TIMEOUT_MSG_START + 0x24)
 
-#define SIR_LIM_CCX_TSM_TIMEOUT        (SIR_LIM_TIMEOUT_MSG_START + 0x25)
+#define SIR_LIM_ESE_TSM_TIMEOUT        (SIR_LIM_TIMEOUT_MSG_START + 0x25)
 
 #define SIR_LIM_DISASSOC_ACK_TIMEOUT       (SIR_LIM_TIMEOUT_MSG_START + 0x26)
 #define SIR_LIM_DEAUTH_ACK_TIMEOUT       (SIR_LIM_TIMEOUT_MSG_START + 0x27)

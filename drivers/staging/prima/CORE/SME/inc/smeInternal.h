@@ -92,6 +92,7 @@ typedef enum eSmeCommandType
     eSmeCommandTdlsAddPeer, 
     eSmeCommandTdlsDelPeer, 
     eSmeCommandTdlsLinkEstablish,
+    eSmeCommandTdlsChannelSwitch, // tdlsoffchan
 #ifdef FEATURE_WLAN_TDLS_INTERNAL
     eSmeCommandTdlsDiscovery,
     eSmeCommandTdlsLinkSetup,
@@ -147,7 +148,7 @@ typedef struct tagSmeStruct
     void *pTxPerHitCbContext;
     tVOS_CON_MODE currDeviceMode;
 #ifdef FEATURE_WLAN_LPHB
-    void (*pLphbWaitTimeoutCb) (void *pAdapter, void *indParam);
+    void (*pLphbIndCb) (void *pAdapter, void *indParam);
 #endif /* FEATURE_WLAN_LPHB */
     //pending scan command list
     tDblLinkList smeScanCmdPendingList;
@@ -156,6 +157,20 @@ typedef struct tagSmeStruct
 #ifdef FEATURE_WLAN_CH_AVOID
     void (*pChAvoidNotificationCb) (void *pAdapter, void *indParam);
 #endif /* FEATURE_WLAN_CH_AVOID */
+
+#ifdef WLAN_FEATURE_LINK_LAYER_STATS
+   /* HDD callback to be called after receiving Link Layer Stats Results IND from FW */
+   void(*pLinkLayerStatsIndCallback)(void *callbackContext,
+                                     int indType, void *pRsp, tANI_U8 *macAddr );
+   void *pLinkLayerStatsCallbackContext;
+#endif
+#ifdef WLAN_FEATURE_EXTSCAN
+   void (*pEXTScanIndCb) (void *, const tANI_U16, void *);
+   /* Use this request ID while sending Full Scan Results */
+   int  extScanStartReqId;
+   void *pEXTScanCallbackContext;
+#endif /* WLAN_FEATURE_EXTSCAN */
+
 } tSmeStruct, *tpSmeStruct;
 
 

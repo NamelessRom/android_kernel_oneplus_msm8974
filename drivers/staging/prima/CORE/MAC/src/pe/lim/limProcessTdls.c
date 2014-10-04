@@ -124,6 +124,11 @@ void PopulateDot11fLinkIden(tpAniSirGlobal pMac, tpPESession psessionEntry,
 void PopulateDot11fTdlsExtCapability(tpAniSirGlobal pMac, 
                                     tDot11fIEExtCap *extCapability) ;
 
+void PopulateDot11fTdlsOffchannelParams(tpAniSirGlobal pMac,
+          tpPESession psessionEntry,
+          tDot11fIESuppChannels *suppChannels,
+          tDot11fIESuppOperatingClasses *suppOperClasses);
+
 void limLogVHTCap(tpAniSirGlobal pMac,
                               tDot11fIEVHTCaps *pDot11f);
 tSirRetStatus limPopulateVhtMcsSet(tpAniSirGlobal pMac,
@@ -131,6 +136,80 @@ tSirRetStatus limPopulateVhtMcsSet(tpAniSirGlobal pMac,
                                   tDot11fIEVHTCaps *pPeerVHTCaps,
                                   tpPESession psessionEntry);
 ePhyChanBondState  limGetHTCBState(ePhyChanBondState aniCBMode);
+/*only 31 op classes are available, 1 entry for current op class*/
+static tDot11fIESuppOperatingClasses op_classes = {0};
+
+op_class_map_t global_op_class[] = {
+    {81, 25,  BW20,      {1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13}},
+    {82, 25,  BW20,      {14}},
+    {83, 40,  BW40PLUS,  {1, 2, 3, 4, 5, 6, 7, 8, 9}},
+    {84, 40,  BW40MINUS, {5, 6, 7, 8, 9, 10, 11, 12, 13}},
+    {115, 20, BW20,      {36, 40, 44, 48}},
+    {116, 40, BW40PLUS,  {36, 44}},
+    {117, 40, BW40MINUS, {40, 48}},
+    {118, 20, BW20,      {52, 56, 60, 64}},
+    {119, 40, BW40PLUS,  {52, 60}},
+    {120, 40, BW40MINUS, {56, 64}},
+    {121, 20, BW20,   {100, 104, 108, 112, 116, 120, 124, 128, 132, 136, 140}},
+    {122, 40, BW40PLUS,  {100, 108, 116, 124, 132}},
+    {123, 40, BW40MINUS, {104, 112, 120, 128, 136}},
+    {125, 20, BW20,      {149, 153, 157, 161, 165, 169}},
+    {126, 40, BW40PLUS,  {149, 157}},
+    {127, 40, BW40MINUS, {153, 161}},
+    {0, 0, 0, {0}},
+
+};/*end global_op_class*/
+
+op_class_map_t us_op_class[] = {
+    {1, 20,  BW20,       {36, 40, 44, 48}},
+    {2, 20,  BW20,       {52, 56, 60, 64}},
+    {4, 20,  BW20,   {100, 104, 108, 112, 116, 120, 124, 128, 132, 136, 140}},
+    {5, 20,  BW20,       {149, 153, 157, 161, 165}},
+    {22, 40, BW40PLUS,  {36, 44}},
+    {23, 40, BW40PLUS,  {52, 60}},
+    {24, 40, BW40PLUS,  {100, 108, 116, 124, 132}},
+    {26, 40, BW40PLUS,  {149, 157}},
+    {27, 40, BW40MINUS, {40, 48}},
+    {28, 40, BW40MINUS, {56, 64}},
+    {29, 40, BW40MINUS, {104, 112, 120, 128, 136}},
+    {31, 40, BW40MINUS, {153, 161}},
+    {32, 40, BW40PLUS,  {1, 2, 3, 4, 5, 6, 7}},
+    {33, 40, BW40MINUS, {5, 6, 7, 8, 9, 10, 11}},
+    {0, 0, 0, {0}},
+};/*end us_op_class*/
+
+op_class_map_t euro_op_class[] = {
+    {1, 20,  BW20,      {36, 40, 44, 48}},
+    {2, 20,  BW20,      {52, 56, 60, 64}},
+    {3, 20,  BW20,   {100, 104, 108, 112, 116, 120, 124, 128, 132, 136, 140}},
+    {4, 25,  BW20,      {1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13}},
+    {5, 40,  BW40PLUS,  {36, 44}},
+    {6, 40,  BW40PLUS,  {52, 60}},
+    {7, 40,  BW40PLUS,  {100, 108, 116, 124, 132}},
+    {8, 40,  BW40MINUS, {40, 48}},
+    {9, 40,  BW40MINUS, {56, 64}},
+    {10, 40, BW40MINUS, {104, 112, 120, 128, 136}},
+    {11, 40, BW40PLUS,  {1, 2, 3, 4, 5, 6, 7, 8, 9}},
+    {12, 40, BW40MINUS, {5, 6, 7, 8, 9, 10, 11, 12, 13}},
+    {17, 20, BW20,      {149, 153, 157, 161, 165, 169}},
+    {0, 0, 0, {0}},
+};/*end euro_op_class*/
+
+op_class_map_t japan_op_class[] = {
+    {1, 20,  BW20,      {36, 40, 44, 48}},
+    {30, 25, BW20,      {1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13}},
+    {31, 25, BW20,      {14}},
+    {32, 20, BW20,      {52, 56, 60, 64}},
+    {34, 20, BW20,   {100, 104, 108, 112, 116, 120, 124, 128, 132, 136, 140}},
+    {36, 40, BW40PLUS,  {36, 44}},
+    {37, 40, BW40PLUS,  {52, 60}},
+    {39, 40, BW40PLUS,  {100, 108, 116, 124, 132}},
+    {41, 40, BW40MINUS, {40, 48}},
+    {42, 40, BW40MINUS, {56, 64}},
+    {44, 40, BW40MINUS, {104, 112, 120, 128, 136}},
+    {0, 0, 0, {0}},
+};/*end japan_op_class*/
+
 /*
  * TDLS data frames will go out/come in as non-qos data.
  * so, eth_890d_header will be aligned access..
@@ -172,6 +251,15 @@ typedef enum tdlsLinkSetupStatus
     TDLS_SETUP_STATUS_FAILURE = 37
 }etdlsLinkSetupStatus ;
 
+/* These maps to Kernel TDLS peer capability
+ * flags and should get changed as and when necessary
+ */
+enum tdls_peer_capability {
+        TDLS_PEER_HT_CAP  = 0,
+        TDLS_PEER_VHT_CAP = 1,
+        TDLS_PEER_WMM_CAP = 2
+} eTdlsPeerCapability;
+
 /* some local defines */
 #define LINK_IDEN_BSSID_OFFSET      (0)
 #define PEER_MAC_OFFSET   (12) 
@@ -210,7 +298,6 @@ typedef enum tdlsLinkSetupStatus
 
 
 #ifdef LIM_DEBUG_TDLS
-#define TDLS_CASE_RETURN_STRING(x) case (x): return( ((const tANI_U8*)#x) + 8);  /* 8 = remove redundant SIR_MAC_ */
 
 #ifdef FEATURE_WLAN_TDLS
 #define WNI_CFG_TDLS_DISCOVERY_RSP_WAIT             (100)
@@ -230,16 +317,16 @@ const tANI_U8* limTraceTdlsActionString( tANI_U8 tdlsActionCode )
 {
    switch( tdlsActionCode )
    {
-       TDLS_CASE_RETURN_STRING(SIR_MAC_TDLS_SETUP_REQ);
-       TDLS_CASE_RETURN_STRING(SIR_MAC_TDLS_SETUP_RSP);
-       TDLS_CASE_RETURN_STRING(SIR_MAC_TDLS_SETUP_CNF);
-       TDLS_CASE_RETURN_STRING(SIR_MAC_TDLS_TEARDOWN);
-       TDLS_CASE_RETURN_STRING(SIR_MAC_TDLS_PEER_TRAFFIC_IND);
-       TDLS_CASE_RETURN_STRING(SIR_MAC_TDLS_CH_SWITCH_REQ);
-       TDLS_CASE_RETURN_STRING(SIR_MAC_TDLS_CH_SWITCH_RSP);
-       TDLS_CASE_RETURN_STRING(SIR_MAC_TDLS_PEER_TRAFFIC_RSP);
-       TDLS_CASE_RETURN_STRING(SIR_MAC_TDLS_DIS_REQ);
-       TDLS_CASE_RETURN_STRING(SIR_MAC_TDLS_DIS_RSP);
+       CASE_RETURN_STRING(SIR_MAC_TDLS_SETUP_REQ);
+       CASE_RETURN_STRING(SIR_MAC_TDLS_SETUP_RSP);
+       CASE_RETURN_STRING(SIR_MAC_TDLS_SETUP_CNF);
+       CASE_RETURN_STRING(SIR_MAC_TDLS_TEARDOWN);
+       CASE_RETURN_STRING(SIR_MAC_TDLS_PEER_TRAFFIC_IND);
+       CASE_RETURN_STRING(SIR_MAC_TDLS_CH_SWITCH_REQ);
+       CASE_RETURN_STRING(SIR_MAC_TDLS_CH_SWITCH_RSP);
+       CASE_RETURN_STRING(SIR_MAC_TDLS_PEER_TRAFFIC_RSP);
+       CASE_RETURN_STRING(SIR_MAC_TDLS_DIS_REQ);
+       CASE_RETURN_STRING(SIR_MAC_TDLS_DIS_RSP);
    }
    return (const tANI_U8*)"UNKNOWN";
 }
@@ -936,7 +1023,7 @@ static void PopulateDot11fTdlsHtVhtCap(tpAniSirGlobal pMac, uint32 selfDot11Mode
             IS_FEATURE_SUPPORTED_BY_FW(DOT11AC))
         {
             /* Include VHT Capability IE */
-            PopulateDot11fVHTCaps( pMac, vhtCap );
+            PopulateDot11fVHTCaps( pMac, vhtCap, eSIR_FALSE );
         }
         else
         {
@@ -955,8 +1042,10 @@ static void PopulateDot11fTdlsHtVhtCap(tpAniSirGlobal pMac, uint32 selfDot11Mode
  * Send TDLS discovery response frame on direct link.
  */
 
-static tSirRetStatus limSendTdlsDisRspFrame(tpAniSirGlobal pMac, 
-                     tSirMacAddr peerMac, tANI_U8 dialog, tpPESession psessionEntry)
+static tSirRetStatus limSendTdlsDisRspFrame(tpAniSirGlobal pMac,
+                     tSirMacAddr peerMac, tANI_U8 dialog,
+                     tpPESession psessionEntry, tANI_U8 *addIe,
+                     tANI_U16 addIeLen)
 {
     tDot11fTDLSDisRsp   tdlsDisRsp ;
     tANI_U16            caps = 0 ;            
@@ -1019,6 +1108,10 @@ static tSirRetStatus limSendTdlsDisRspFrame(tpAniSirGlobal pMac,
     PopulateDot11fTdlsHtVhtCap( pMac, selfDot11Mode, &tdlsDisRsp.HTCaps,
                                &tdlsDisRsp.VHTCaps, psessionEntry );
 
+    if ( 1 == pMac->lim.gLimTDLSOffChannelEnabled )
+        PopulateDot11fTdlsOffchannelParams( pMac, psessionEntry,
+                                            &tdlsDisRsp.SuppChannels,
+                                            &tdlsDisRsp.SuppOperatingClasses);
     /* 
      * now we pack it.  First, how much space are we going to need?
      */
@@ -1044,7 +1137,7 @@ static tSirRetStatus limSendTdlsDisRspFrame(tpAniSirGlobal pMac,
      */ 
 
 
-    nBytes = nPayload + sizeof( tSirMacMgmtHdr ) ;
+    nBytes = nPayload + sizeof( tSirMacMgmtHdr ) + addIeLen;
 
     /* Ok-- try to allocate memory from MGMT PKT pool */
 
@@ -1125,6 +1218,13 @@ static tSirRetStatus limSendTdlsDisRspFrame(tpAniSirGlobal pMac,
         }
     }
 #endif
+    if (0 != addIeLen)
+    {
+        LIM_LOG_TDLS(VOS_TRACE(VOS_MODULE_ID_PE, VOS_TRACE_LEVEL_ERROR,
+                     ("Copy Additional Ie Len = %d"), addIeLen ));
+        vos_mem_copy(pFrame + sizeof(tSirMacMgmtHdr) + nPayload, addIe,
+                                                              addIeLen);
+    }
     VOS_TRACE(VOS_MODULE_ID_PE, VOS_TRACE_LEVEL_INFO, 
                  ("transmitting Discovery response on direct link")) ;
 
@@ -1255,23 +1355,30 @@ tSirRetStatus limSendTdlsLinkSetupReqFrame(tpAniSirGlobal pMac,
     /* Populate extended supported rates */
     PopulateDot11fTdlsExtCapability( pMac, &tdlsSetupReq.ExtCap );
 
-   /*
-     * TODO: we need to see if we have to support conditions where we have
-     * EDCA parameter info element is needed a) if we need different QOS
-     * parameters for off channel operations or QOS is not supported on
-     * AP link and we wanted to QOS on direct link.
-     */
-    /* Populate QOS info, needed for Peer U-APSD session */
-    /* TODO: Now hardcoded, because PopulateDot11fQOSCapsStation() depends on AP's capability, and
-    TDLS doesn't want to depend on AP's capability */
-    tdlsSetupReq.QOSCapsStation.present = 1;
-    tdlsSetupReq.QOSCapsStation.max_sp_length = 0;
-    tdlsSetupReq.QOSCapsStation.qack = 0;
-    tdlsSetupReq.QOSCapsStation.acbe_uapsd = ((pMac->lim.gLimTDLSUapsdMask & 0x08) >> 3) ;
-    tdlsSetupReq.QOSCapsStation.acbk_uapsd = ((pMac->lim.gLimTDLSUapsdMask & 0x04)>> 2);
-    tdlsSetupReq.QOSCapsStation.acvi_uapsd = ((pMac->lim.gLimTDLSUapsdMask & 0x02)>> 1);
-    tdlsSetupReq.QOSCapsStation.acvo_uapsd = (pMac->lim.gLimTDLSUapsdMask & 0x01);
-
+    if ( 1 == pMac->lim.gLimTDLSWmmMode )
+    {
+        /* include WMM IE */
+        PopulateDot11fWMMInfoStation( pMac, &tdlsSetupReq.WMMInfoStation );
+    }
+    else
+    {
+        /*
+         * TODO: we need to see if we have to support conditions where we have
+         * EDCA parameter info element is needed a) if we need different QOS
+         * parameters for off channel operations or QOS is not supported on
+         * AP link and we wanted to QOS on direct link.
+         */
+        /* Populate QOS info, needed for Peer U-APSD session */
+        /* TODO: Now hardcoded, because PopulateDot11fQOSCapsStation() depends on AP's capability, and
+         TDLS doesn't want to depend on AP's capability */
+        tdlsSetupReq.QOSCapsStation.present = 1;
+        tdlsSetupReq.QOSCapsStation.max_sp_length = 0;
+        tdlsSetupReq.QOSCapsStation.qack = 0;
+        tdlsSetupReq.QOSCapsStation.acbe_uapsd = ((pMac->lim.gLimTDLSUapsdMask & 0x08) >> 3);
+        tdlsSetupReq.QOSCapsStation.acbk_uapsd = ((pMac->lim.gLimTDLSUapsdMask & 0x04) >> 2);
+        tdlsSetupReq.QOSCapsStation.acvi_uapsd = ((pMac->lim.gLimTDLSUapsdMask & 0x02) >> 1);
+        tdlsSetupReq.QOSCapsStation.acvo_uapsd = (pMac->lim.gLimTDLSUapsdMask & 0x01);
+    }
 
     /*
      * we will always try to init TDLS link with 11n capabilities
@@ -1289,6 +1396,10 @@ tSirRetStatus limSendTdlsLinkSetupReqFrame(tpAniSirGlobal pMac,
     PopulateDotfTdlsVhtAID( pMac, selfDot11Mode, peerMac,
                             &tdlsSetupReq.AID, psessionEntry );
 
+    if ( 1 == pMac->lim.gLimTDLSOffChannelEnabled )
+        PopulateDot11fTdlsOffchannelParams( pMac, psessionEntry,
+                                            &tdlsSetupReq.SuppChannels,
+                                            &tdlsSetupReq.SuppOperatingClasses);
     /*
      * now we pack it.  First, how much space are we going to need?
      */
@@ -1669,22 +1780,30 @@ static tSirRetStatus limSendTdlsSetupRspFrame(tpAniSirGlobal pMac,
     /* Populate extended supported rates */
     PopulateDot11fTdlsExtCapability( pMac, &tdlsSetupRsp.ExtCap );
 
-    /* 
-     * TODO: we need to see if we have to support conditions where we have
-     * EDCA parameter info element is needed a) if we need different QOS
-     * parameters for off channel operations or QOS is not supported on 
-     * AP link and we wanted to QOS on direct link.
-     */
-    /* Populate QOS info, needed for Peer U-APSD session */
-    /* TODO: Now hardcoded, because PopulateDot11fQOSCapsStation() depends on AP's capability, and
-    TDLS doesn't want to depend on AP's capability */
-    tdlsSetupRsp.QOSCapsStation.present = 1;
-    tdlsSetupRsp.QOSCapsStation.max_sp_length = 0;
-    tdlsSetupRsp.QOSCapsStation.qack = 0;
-    tdlsSetupRsp.QOSCapsStation.acbe_uapsd = ((pMac->lim.gLimTDLSUapsdMask & 0x08) >> 3);
-    tdlsSetupRsp.QOSCapsStation.acbk_uapsd = ((pMac->lim.gLimTDLSUapsdMask & 0x04) >> 2);
-    tdlsSetupRsp.QOSCapsStation.acvi_uapsd = ((pMac->lim.gLimTDLSUapsdMask & 0x02) >> 1);
-    tdlsSetupRsp.QOSCapsStation.acvo_uapsd = (pMac->lim.gLimTDLSUapsdMask & 0x01);
+    if ( 1 == pMac->lim.gLimTDLSWmmMode )
+    {
+        /* include WMM IE */
+        PopulateDot11fWMMInfoStation( pMac, &tdlsSetupRsp.WMMInfoStation );
+    }
+    else
+    {
+        /*
+         * TODO: we need to see if we have to support conditions where we have
+         * EDCA parameter info element is needed a) if we need different QOS
+         * parameters for off channel operations or QOS is not supported on
+         * AP link and we wanted to QOS on direct link.
+         */
+        /* Populate QOS info, needed for Peer U-APSD session */
+        /* TODO: Now hardcoded, because PopulateDot11fQOSCapsStation() depends on AP's capability, and
+         TDLS doesn't want to depend on AP's capability */
+        tdlsSetupRsp.QOSCapsStation.present = 1;
+        tdlsSetupRsp.QOSCapsStation.max_sp_length = 0;
+        tdlsSetupRsp.QOSCapsStation.qack = 0;
+        tdlsSetupRsp.QOSCapsStation.acbe_uapsd = ((pMac->lim.gLimTDLSUapsdMask & 0x08) >> 3);
+        tdlsSetupRsp.QOSCapsStation.acbk_uapsd = ((pMac->lim.gLimTDLSUapsdMask & 0x04) >> 2);
+        tdlsSetupRsp.QOSCapsStation.acvi_uapsd = ((pMac->lim.gLimTDLSUapsdMask & 0x02) >> 1);
+        tdlsSetupRsp.QOSCapsStation.acvo_uapsd = (pMac->lim.gLimTDLSUapsdMask & 0x01);
+    }
 
     wlan_cfgGetInt(pMac,WNI_CFG_DOT11_MODE,&selfDot11Mode);
 
@@ -1695,6 +1814,11 @@ static tSirRetStatus limSendTdlsSetupRspFrame(tpAniSirGlobal pMac,
     /* Populate AID */
     PopulateDotfTdlsVhtAID( pMac, selfDot11Mode, peerMac,
                             &tdlsSetupRsp.AID, psessionEntry );
+
+    if ( 1 == pMac->lim.gLimTDLSOffChannelEnabled )
+        PopulateDot11fTdlsOffchannelParams( pMac, psessionEntry,
+                                            &tdlsSetupRsp.SuppChannels,
+                                            &tdlsSetupRsp.SuppOperatingClasses);
 
     tdlsSetupRsp.Status.status = setupStatus ;
 
@@ -1824,7 +1948,7 @@ static tSirRetStatus limSendTdlsSetupRspFrame(tpAniSirGlobal pMac,
  */
 
 tSirRetStatus limSendTdlsLinkSetupCnfFrame(tpAniSirGlobal pMac, tSirMacAddr peerMac,
-                    tANI_U8 dialog, tpPESession psessionEntry, tANI_U8* addIe, tANI_U16 addIeLen)  
+                    tANI_U8 dialog, tANI_U32 peerCapability, tpPESession psessionEntry, tANI_U8* addIe, tANI_U16 addIeLen)
 {
     tDot11fTDLSSetupCnf  tdlsSetupCnf ;
     tANI_U32            status = 0 ;
@@ -1867,15 +1991,21 @@ tSirRetStatus limSendTdlsLinkSetupCnfFrame(tpAniSirGlobal pMac, tSirMacAddr peer
      * AP link and we wanted to QOS on direct link.
      */
 
-    /* Include HT Info IE */
-    /* Need to also check the Self Capability ??? TODO Sunil */
-    if ( true == psessionEntry->htCapability)
+    /* Check self and peer WMM capable */
+    if ((1 == pMac->lim.gLimTDLSWmmMode) && (CHECK_BIT(peerCapability, TDLS_PEER_WMM_CAP)))
     {
-        PopulateDot11fHTInfo( pMac, &tdlsSetupCnf.HTInfo, psessionEntry );
+       PopulateDot11fWMMParams(pMac, &tdlsSetupCnf.WMMParams, psessionEntry);
     }
-    if ( true == psessionEntry->vhtCapability)
+
+     /* Check peer is VHT capable*/
+    if (CHECK_BIT(peerCapability, TDLS_PEER_VHT_CAP))
     {
-        PopulateDot11fVHTOperation( pMac, &tdlsSetupCnf.VHTOperation);
+       PopulateDot11fVHTOperation( pMac, &tdlsSetupCnf.VHTOperation);
+       PopulateDot11fHTInfo( pMac, &tdlsSetupCnf.HTInfo, psessionEntry );
+    }
+    else if (CHECK_BIT(peerCapability, TDLS_PEER_HT_CAP)) /* Check peer is HT capable */
+    {
+       PopulateDot11fHTInfo( pMac, &tdlsSetupCnf.HTInfo, psessionEntry );
     }
 
     /* 
@@ -2419,6 +2549,7 @@ limTdlsPopulateMatchingRateSet(tpAniSirGlobal pMac,
     tANI_U32 phyMode;
     tANI_U8 mcsSet[SIZE_OF_SUPPORTED_MCS_SET];
     isArate=0;
+    tempRateSet2.numRates = 0;
 
     // limGetPhyMode(pMac, &phyMode);
     limGetPhyMode(pMac, &phyMode, NULL);
@@ -2445,8 +2576,6 @@ limTdlsPopulateMatchingRateSet(tpAniSirGlobal pMac,
                                                   &val) != eSIR_SUCCESS)
         tempRateSet2.numRates = val;
     }
-    else
-        tempRateSet2.numRates = 0;
 
     if ((tempRateSet.numRates + tempRateSet2.numRates) > 12)
     {
@@ -2493,11 +2622,17 @@ limTdlsPopulateMatchingRateSet(tpAniSirGlobal pMac,
      * unicity of the rates so there cannot be more than 12 . Need to Check this
      * TODO Sunil.
      */
+    if (supporteRatesLength > SIR_MAC_RATESET_EID_MAX)
+    {
+       limLog( pMac, LOGW, FL("Supported rates length %d more than "
+                              "the Max limit, reset to Max"),
+                               supporteRatesLength);
+       supporteRatesLength = SIR_MAC_RATESET_EID_MAX;
+    }
     for (i = 0; i < supporteRatesLength; i++)
     {
         tempRateSet.rate[i] = pSupportedRateSet[i];
     }
-
     tempRateSet.numRates = supporteRatesLength;
 
     {
@@ -3102,7 +3237,8 @@ static tSirRetStatus limProcessTdlsDisReqFrame(tpAniSirGlobal pMac,
         else
         {
             peerInfo->delStaNeeded = false ;
-            limSendTdlsDisRspFrame(pMac, peerInfo->peerMac, peerInfo->dialog, psessionEntry) ;
+            limSendTdlsDisRspFrame(pMac, peerInfo->peerMac, peerInfo->dialog,
+                                   psessionEntry, NULL, 0);
             peerInfo->tdlsPeerState = TDLS_DIS_RSP_SENT_WAIT_STATE ;
         }
 
@@ -3529,7 +3665,7 @@ static tSirRetStatus limProcessTdlsSetupRspFrame(tpAniSirGlobal pMac,
     
          
     /* send TDLS confim frame to TDLS Peer STA */           
-    limSendTdlsLinkSetupCnfFrame(pMac, peerMac, tdlsSetupRsp.DialogToken.token, psessionEntry, NULL, 0) ;
+    limSendTdlsLinkSetupCnfFrame(pMac, peerMac, tdlsSetupRsp.DialogToken.token, 0, psessionEntry, NULL, 0) ;
 
     /* 
      * set the tdls_link_state to TDLS_LINK_SETUP_RSP_WAIT_STATE, and
@@ -4847,7 +4983,8 @@ eHalStatus limProcessTdlsAddStaRsp(tpAniSirGlobal pMac, void *msg,
              * is rolling.., once discovery response is get Acked, we will 
              * send response to SME based on TxComplete callback results
              */ 
-            limSendTdlsDisRspFrame(pMac, peerInfo->peerMac, peerInfo->dialog, psessionEntry) ;
+            limSendTdlsDisRspFrame(pMac, peerInfo->peerMac, peerInfo->dialog,
+                                   psessionEntry, NULL, 0);
             peerInfo->tdlsPeerState = TDLS_DIS_RSP_SENT_WAIT_STATE ;
         }
     } while(0) ;
@@ -4859,12 +4996,70 @@ add_sta_error:
     return status ;
 }
 
+void PopulateDot11fTdlsOffchannelParams(tpAniSirGlobal pMac,
+                             tpPESession psessionEntry,
+                             tDot11fIESuppChannels *suppChannels,
+                             tDot11fIESuppOperatingClasses *suppOperClasses)
+{
+    tANI_U32   numChans = WNI_CFG_VALID_CHANNEL_LIST_LEN;
+    tANI_U8    validChan[WNI_CFG_VALID_CHANNEL_LIST_LEN];
+    tANI_U8    i;
+    tANI_U8    op_class;
+    if (wlan_cfgGetStr(pMac, WNI_CFG_VALID_CHANNEL_LIST,
+                          validChan, &numChans) != eSIR_SUCCESS)
+    {
+        /**
+         * Could not get Valid channel list from CFG.
+         * Log error.
+         */
+         limLog(pMac, LOGP,
+                FL("could not retrieve Valid channel list"));
+    }
+    suppChannels->num_bands = (tANI_U8) numChans;
+
+    for ( i = 0U; i < suppChannels->num_bands; i++)
+    {
+        suppChannels->bands[i][0] = validChan[i];
+        suppChannels->bands[i][1] = 1;
+    }
+    suppChannels->present = 1 ;
+    /*Get present operating class based on current operating channel*/
+    op_class = limGetOPClassFromChannel(
+                                     pMac->scan.countryCodeCurrent,
+                                     psessionEntry->currentOperChannel,
+                                     psessionEntry->htSecondaryChannelOffset);
+    if (op_class == 0)
+    {
+        PELOGE(limLog(pMac, LOGE, FL("Present Operating class is Wrong!!!"));)
+    }
+    else
+    {
+        PELOGE(limLog(pMac, LOG1, FL("Present Operating channel=%d offset=%d class=%d"),
+                      psessionEntry->currentOperChannel,
+                      psessionEntry->htSecondaryChannelOffset,
+                      op_class);)
+    }
+    suppOperClasses->present = 1;
+    suppOperClasses->classes[0] = op_class;
+    /*Fill operating classes from static array*/
+    suppOperClasses->num_classes = op_classes.num_classes;
+    for ( i = 0U; i < suppOperClasses->num_classes; i++)
+    {
+        suppOperClasses->classes[i+1] = op_classes.classes[i];
+
+    }
+    /*increment for present operating class*/
+    suppOperClasses->num_classes++;
+    return ;
+}
+
+
 /*
  * FUNCTION: Populate Link Identifier element IE
  *
  */
 
- 
+
 void PopulateDot11fLinkIden(tpAniSirGlobal pMac, tpPESession psessionEntry, 
                                  tDot11fIELinkIdentifier *linkIden,
                                        tSirMacAddr peerMac, tANI_U8 reqType)
@@ -4896,7 +5091,7 @@ void PopulateDot11fTdlsExtCapability(tpAniSirGlobal pMac,
 {
     extCapability->TDLSPeerPSMSupp = PEER_PSM_SUPPORT ;
     extCapability->TDLSPeerUAPSDBufferSTA = pMac->lim.gLimTDLSBufStaEnabled;
-    extCapability->TDLSChannelSwitching = CH_SWITCH_SUPPORT ;
+    extCapability->TDLSChannelSwitching = pMac->lim.gLimTDLSOffChannelEnabled ;
     extCapability->TDLSSupport = TDLS_SUPPORT ;
     extCapability->TDLSProhibited = TDLS_PROHIBITED ;
     extCapability->TDLSChanSwitProhibited = TDLS_CH_SWITCH_PROHIBITED ;
@@ -5037,7 +5232,9 @@ tSirRetStatus limProcessSmeTdlsMgmtSendReq(tpAniSirGlobal pMac,
             {
                 //Send a response mgmt action frame
                 limSendTdlsDisRspFrame(pMac, pSendMgmtReq->peerMac,
-                        pSendMgmtReq->dialog, psessionEntry) ;
+                        pSendMgmtReq->dialog, psessionEntry,
+                        &pSendMgmtReq->addIe[0],
+                        (pSendMgmtReq->length - sizeof(tSirTdlsSendMgmtReq)));
                 resultCode = eSIR_SME_SUCCESS;
             }
             break;
@@ -5059,7 +5256,7 @@ tSirRetStatus limProcessSmeTdlsMgmtSendReq(tpAniSirGlobal pMac,
             break;
         case SIR_MAC_TDLS_SETUP_CNF:
             {
-                limSendTdlsLinkSetupCnfFrame(pMac, pSendMgmtReq->peerMac, pSendMgmtReq->dialog, 
+                limSendTdlsLinkSetupCnfFrame(pMac, pSendMgmtReq->peerMac, pSendMgmtReq->dialog, pSendMgmtReq->peerCapability,
                         psessionEntry, &pSendMgmtReq->addIe[0], (pSendMgmtReq->length - sizeof(tSirTdlsSendMgmtReq)));  
                 resultCode = eSIR_SME_SUCCESS;
             }
@@ -5132,6 +5329,37 @@ void limSendSmeTdlsLinkEstablishReqRsp(tpAniSirGlobal pMac,
 
 }
 
+/*
+ * Send Response to Chan Switch Request to SME
+ */
+void limSendSmeTdlsChanSwitchReqRsp(tpAniSirGlobal pMac,
+                    tANI_U8 sessionId, tSirMacAddr peerMac, tDphHashNode   *pStaDs,
+                    tANI_U8 status)
+{
+    tSirMsgQ  mmhMsg = {0} ;
+
+    tSirTdlsChanSwitchReqRsp *pTdlsChanSwitchReqRsp = NULL ;
+
+    pTdlsChanSwitchReqRsp = vos_mem_malloc(sizeof(tSirTdlsChanSwitchReqRsp));
+    if ( NULL == pTdlsChanSwitchReqRsp )
+    {
+        PELOGE(limLog(pMac, LOGE, FL("Failed to allocate memory"));)
+        return ;
+    }
+    pTdlsChanSwitchReqRsp->statusCode = status ;
+    if ( peerMac )
+    {
+        vos_mem_copy(pTdlsChanSwitchReqRsp->peerMac, peerMac, sizeof(tSirMacAddr));
+    }
+    pTdlsChanSwitchReqRsp->sessionId = sessionId;
+    mmhMsg.type = eWNI_SME_TDLS_CHANNEL_SWITCH_RSP ;
+    mmhMsg.bodyptr = pTdlsChanSwitchReqRsp;
+    mmhMsg.bodyval = 0;
+    limSysProcessMmhMsgApi(pMac, &mmhMsg, ePROT);
+    return ;
+
+
+}
 /*
  * Once link is teardown, send Del Peer Ind to SME
  */
@@ -5309,7 +5537,38 @@ lim_tdls_del_sta_error:
     return eSIR_SUCCESS;
 }
 
+/* Intersects the two input arrays and outputs an array */
+/* For now the array length of tANI_U8 suffices */
+static void limTdlsGetIntersection(tANI_U8 *input_array1,tANI_U8 input1_length,
+                            tANI_U8 *input_array2,tANI_U8 input2_length,
+                            tANI_U8 *output_array,tANI_U8 *output_length)
+{
+    tANI_U8 i,j,k=0,flag=0;
 
+    if (input1_length > WNI_CFG_VALID_CHANNEL_LIST_LEN)
+    {
+       input1_length = WNI_CFG_VALID_CHANNEL_LIST_LEN;
+    }
+
+    for(i=0;i<input1_length;i++)
+    {
+        flag=0;
+        for(j=0;j<input2_length;j++)
+        {
+            if(input_array1[i]==input_array2[j])
+            {
+                flag=1;
+                break;
+            }
+        }
+        if(flag==1)
+        {
+            output_array[k]=input_array1[i];
+            k++;
+        }
+    }
+    *output_length = k;
+}
 /*
  * Process Link Establishment Request from SME .
  */
@@ -5377,13 +5636,43 @@ tSirRetStatus limProcesSmeTdlsLinkEstablishReq(tpAniSirGlobal pMac,
         return eSIR_MEM_ALLOC_FAILED;
     }
 
-    vos_mem_set( (tANI_U8 *)pMsgTdlsLinkEstablishReq, sizeof(tpTdlsLinkEstablishParams), 0);
+    vos_mem_set( (tANI_U8 *)pMsgTdlsLinkEstablishReq, sizeof(tTdlsLinkEstablishParams), 0);
 
     pMsgTdlsLinkEstablishReq->staIdx = pStaDs->staIndex;
     pMsgTdlsLinkEstablishReq->isResponder = pTdlsLinkEstablishReq->isResponder;
     pMsgTdlsLinkEstablishReq->uapsdQueues = pTdlsLinkEstablishReq->uapsdQueues;
     pMsgTdlsLinkEstablishReq->maxSp = pTdlsLinkEstablishReq->maxSp;
     pMsgTdlsLinkEstablishReq->isBufsta = pTdlsLinkEstablishReq->isBufSta;
+    pMsgTdlsLinkEstablishReq->isOffChannelSupported =
+                                pTdlsLinkEstablishReq->isOffChannelSupported;
+    pMsgTdlsLinkEstablishReq->isOffChannelSupported = 1;
+
+    if ((pTdlsLinkEstablishReq->supportedChannelsLen > 0) &&
+        (pTdlsLinkEstablishReq->supportedChannelsLen <= SIR_MAC_MAX_SUPP_CHANNELS))
+    {
+        tANI_U32   selfNumChans = WNI_CFG_VALID_CHANNEL_LIST_LEN;
+        tANI_U8    selfSupportedChannels[WNI_CFG_VALID_CHANNEL_LIST_LEN];
+        if (wlan_cfgGetStr(pMac, WNI_CFG_VALID_CHANNEL_LIST,
+                          selfSupportedChannels, &selfNumChans) != eSIR_SUCCESS)
+        {
+            /**
+             * Could not get Valid channel list from CFG.
+             * Log error.
+             */
+             limLog(pMac, LOGP,
+                    FL("could not retrieve Valid channel list"));
+        }
+        limTdlsGetIntersection(selfSupportedChannels, selfNumChans,
+                               pTdlsLinkEstablishReq->supportedChannels,
+                               pTdlsLinkEstablishReq->supportedChannelsLen,
+                               pMsgTdlsLinkEstablishReq->validChannels,
+                               &pMsgTdlsLinkEstablishReq->validChannelsLen);
+    }
+    vos_mem_copy(pMsgTdlsLinkEstablishReq->validOperClasses,
+                        pTdlsLinkEstablishReq->supportedOperClasses, pTdlsLinkEstablishReq->supportedOperClassesLen);
+    pMsgTdlsLinkEstablishReq->validOperClassesLen =
+                                pTdlsLinkEstablishReq->supportedOperClassesLen;
+
     msg.type = WDA_SET_TDLS_LINK_ESTABLISH_REQ;
     msg.reserved = 0;
     msg.bodyptr = pMsgTdlsLinkEstablishReq;
@@ -5442,53 +5731,287 @@ tSirRetStatus limDeleteTDLSPeers(tpAniSirGlobal pMac, tpPESession psessionEntry)
 
     return eSIR_SUCCESS;
 }
-#ifdef FEATURE_WLAN_TDLS_OXYGEN_DISAPPEAR_AP
-/* Get the number of TDLS peer connected in the BSS */
-int limGetTDLSPeerCount(tpAniSirGlobal pMac, tpPESession psessionEntry)
+
+
+tANI_U8 limGetOPClassFromChannel(tANI_U8 *country,
+                                         tANI_U8 channel,
+                                         tANI_U8 offset)
 {
-    int i,tdlsPeerCount = 0;
-    /* Check all the set bit in peerAIDBitmap and return the number of TDLS peer counts */
-    for (i = 0; i < sizeof(psessionEntry->peerAIDBitmap)/sizeof(tANI_U32); i++)
+    op_class_map_t *class = NULL;
+    tANI_U16 i = 0;
+
+    if (VOS_TRUE == vos_mem_compare(country,"US", 2))  {
+
+        class = us_op_class;
+
+    } else if (VOS_TRUE == vos_mem_compare(country,"EU", 2)) {
+
+        class = euro_op_class;
+
+    } else if (VOS_TRUE == vos_mem_compare(country,"JP", 2)) {
+
+        class = japan_op_class;
+
+    } else {
+
+        class = global_op_class;
+
+    }
+
+    while (class->op_class)
     {
-        tANI_U32 bitmap;
-        bitmap = psessionEntry->peerAIDBitmap[i];
-        while (bitmap)
+        if ((offset == class->offset) || (offset == BWALL))
         {
-            tdlsPeerCount++;
-            bitmap >>= 1;
+            for (i=0; (i < 15 && class->channels[i]); i++)
+            {
+                if (channel == class->channels[i])
+                    return class->op_class;
+            }
+        }
+        class++;
+    }
+    return 0;
+}
+
+tANI_BOOLEAN  CheckAndAddOP(tANI_U8 class)
+{
+    tANI_U8 i;
+
+    for (i=0; i < (SIR_MAC_MAX_SUPP_OPER_CLASSES - 1); i++)
+    {
+        /*0 is an invalid class. If class is already present ignore*/
+        if (class == op_classes.classes[i])
+            return FALSE;
+        if(op_classes.classes[i] == 0)
+        {
+            return TRUE;
         }
     }
-    return tdlsPeerCount;
+    //limLog(pMac, LOGE, FL("No space left for class = %d"), class);
+    return FALSE;
 }
 
-void limTDLSDisappearAPTrickInd(tpAniSirGlobal pMac, tpDphHashNode pStaDs, tpPESession psessionEntry)
+void limInitOperatingClasses( tHalHandle hHal )
 {
-    tSirMsgQ  mmhMsg;
-    tSirTdlsDisappearAPInd  *pSirTdlsDisappearAPInd;
 
-    pSirTdlsDisappearAPInd = vos_mem_malloc(sizeof(tSirTdlsDisappearAPInd));
-    if ( NULL == pSirTdlsDisappearAPInd )
+    tANI_U8 Index = 0;
+    tANI_U8 class = 0;
+    tANI_U8 i = 0;
+    tANI_U8 j = 0;
+    tANI_U8 swap = 0;
+    tANI_U8 numChannels = 0;
+    tpAniSirGlobal pMac = PMAC_STRUCT( hHal );
+    limLog(pMac, LOG1, FL("Current Country = %c%c"),
+                          pMac->scan.countryCodeCurrent[0],
+                          pMac->scan.countryCodeCurrent[1]);
+
+    vos_mem_set(op_classes.classes, sizeof(op_classes.classes), 0);
+    numChannels = pMac->scan.baseChannels.numChannels;
+    limLog(pMac, LOG1, "Num of base ch =%d", numChannels);
+    for ( Index = 0;
+          Index < numChannels && i < (SIR_MAC_MAX_SUPP_OPER_CLASSES - 1);
+          Index++)
     {
-        limLog(pMac, LOGP, FL("AllocateMemory failed for eWNI_SME_TDLS_DEL_ALL_PEER_IND"));
-        return;
+        class = limGetOPClassFromChannel(
+                            pMac->scan.countryCodeCurrent,
+                            pMac->scan.baseChannels.channelList[ Index ],
+                            BWALL);
+        limLog(pMac, LOG4, "ch=%d <=> %d=class",
+               pMac->scan.baseChannels.channelList[ Index ],
+               class);
+        if (CheckAndAddOP(class))
+        {
+            op_classes.classes[i]= class;
+            i++;
+        }
     }
 
-    //messageType
-    pSirTdlsDisappearAPInd->messageType = eWNI_SME_TDLS_AP_DISAPPEAR_IND;
-    pSirTdlsDisappearAPInd->length = sizeof(tSirTdlsDisappearAPInd);
+    numChannels = pMac->scan.base20MHzChannels.numChannels;
+    limLog(pMac, LOG1, "Num of 20MHz ch =%d", numChannels);
+    for ( Index = 0;
+          Index < numChannels && i < (SIR_MAC_MAX_SUPP_OPER_CLASSES - 1);
+          Index++)
+    {
+        class = limGetOPClassFromChannel(
+                            pMac->scan.countryCodeCurrent,
+                            pMac->scan.base20MHzChannels.channelList[ Index ],
+                            BWALL);
+        limLog(pMac, LOG4, "ch=%d <=> %d=class",
+               pMac->scan.base20MHzChannels.channelList[ Index ],
+               class);
+        if (CheckAndAddOP(class))
+        {
+            op_classes.classes[i]= class;
+            i++;
+        }
+    }
 
-    //sessionId
-    pSirTdlsDisappearAPInd->sessionId = psessionEntry->smeSessionId;
-    pSirTdlsDisappearAPInd->staId = pStaDs->staIndex ;
-    vos_mem_copy( pSirTdlsDisappearAPInd->staAddr,
-                           (tANI_U8 *) pStaDs->staAddr, sizeof(tSirMacAddr));
+    numChannels = pMac->scan.base40MHzChannels.numChannels;
+    limLog(pMac, LOG1, "Num of 40MHz ch =%d", numChannels);
+    for ( Index = 0;
+          Index < numChannels && i < (SIR_MAC_MAX_SUPP_OPER_CLASSES - 1);
+          Index++)
+    {
+        class = limGetOPClassFromChannel(
+                            pMac->scan.countryCodeCurrent,
+                            pMac->scan.base40MHzChannels.channelList[ Index ],
+                            BWALL);
+        limLog(pMac, LOG4, "ch=%d <=> %d=class",
+               pMac->scan.base40MHzChannels.channelList[ Index ],
+               class);
+        if (CheckAndAddOP(class))
+        {
+            op_classes.classes[i]= class;
+            i++;
+        }
+    }
 
-    mmhMsg.type = eWNI_SME_TDLS_AP_DISAPPEAR_IND;
-    mmhMsg.bodyptr = pSirTdlsDisappearAPInd;
-    mmhMsg.bodyval = 0;
+    op_classes.num_classes = i;
+    limLog(pMac, LOG1, "Total number of Unique supported classes =%d",
+           op_classes.num_classes);
+    /*as per spec the operating classes should be in ascending order*/
+    /*Bubble sort is fine as we don't have many classes*/
+    for (i = 0 ; i < ( op_classes.num_classes - 1 ); i++)
+    {
+        for (j = 0 ; j < op_classes.num_classes - i - 1; j++)
+        {
+            /* For decreasing order use < */
+            if (op_classes.classes[j] > op_classes.classes[j+1])
+            {
+                swap = op_classes.classes[j];
+                op_classes.classes[j] = op_classes.classes[j+1];
+                op_classes.classes[j+1] = swap;
+            }
+        }
+    }
+    for (i=0; i < op_classes.num_classes; i++)
+    {
 
+        limLog(pMac, LOG1, "supported op_class[%d]=%d", i,
+               op_classes.classes[i]);
 
-    limSysProcessMmhMsgApi(pMac, &mmhMsg, ePROT);
+    }
 }
+
 #endif
-#endif
+// tdlsoffchan
+/*
+ * Process Channel Switch from SME.
+ */
+tSirRetStatus limProcesSmeTdlsChanSwitchReq(tpAniSirGlobal pMac,
+                                            tANI_U32 *pMsgBuf)
+{
+    /* get all discovery request parameters */
+    tSirTdlsChanSwitch *pTdlsChanSwitch = (tSirTdlsChanSwitch*) pMsgBuf ;
+    tpPESession            psessionEntry;
+    tANI_U8                sessionId;
+    tpTdlsChanSwitchParams pMsgTdlsChanSwitch;
+    tSirMsgQ               msg;
+    tANI_U16               peerIdx = 0;
+    tpDphHashNode          pStaDs = NULL;
+
+    VOS_TRACE(VOS_MODULE_ID_PE, VOS_TRACE_LEVEL_INFO,
+             ("TDLS Channel Switch Recieved on peer:" MAC_ADDRESS_STR),
+              MAC_ADDR_ARRAY(pTdlsChanSwitch->peerMac));
+
+    psessionEntry = peFindSessionByBssid(pMac,
+                                         pTdlsChanSwitch->bssid,
+                                         &sessionId);
+    if (psessionEntry == NULL)
+    {
+        VOS_TRACE(VOS_MODULE_ID_PE, VOS_TRACE_LEVEL_ERROR,
+                  "PE Session does not exist for given sme sessionId %d",
+                  pTdlsChanSwitch->sessionId);
+        limSendSmeTdlsChanSwitchReqRsp(pMac, pTdlsChanSwitch->sessionId,
+                                       pTdlsChanSwitch->peerMac,
+                                       NULL, eSIR_FAILURE) ;
+        return eSIR_FAILURE;
+    }
+
+    /* check if we are in proper state to work as TDLS client */
+    if (psessionEntry->limSystemRole != eLIM_STA_ROLE)
+    {
+        VOS_TRACE(VOS_MODULE_ID_PE, VOS_TRACE_LEVEL_ERROR,
+                  "TDLS Channel Switch received in wrong system Role %d",
+                  psessionEntry->limSystemRole);
+        goto lim_tdls_chan_switch_error;
+    }
+
+    /*
+     * if we are still good, go ahead and check if we are in proper state to
+     * do TDLS discovery req/rsp/....frames.
+     */
+    if ((psessionEntry->limSmeState != eLIM_SME_ASSOCIATED_STATE) &&
+            (psessionEntry->limSmeState != eLIM_SME_LINK_EST_STATE))
+    {
+
+        limLog(pMac, LOGE, "TDLS Channel Switch received in invalid LIMsme state (%d)",
+               psessionEntry->limSmeState);
+        goto lim_tdls_chan_switch_error;
+    }
+
+    pStaDs = dphLookupHashEntry(pMac, pTdlsChanSwitch->peerMac, &peerIdx,
+                                &psessionEntry->dph.dphHashTable) ;
+    if ( NULL == pStaDs )
+    {
+        limLog( pMac, LOGE, FL( "pStaDs is NULL" ));
+        goto lim_tdls_chan_switch_error;
+
+    }
+    pMsgTdlsChanSwitch = vos_mem_malloc(sizeof( tTdlsChanSwitchParams ));
+    if ( NULL == pMsgTdlsChanSwitch )
+    {
+        limLog( pMac, LOGE,
+                     FL( "Unable to allocate memory TDLS Channel Switch" ));
+        return eSIR_MEM_ALLOC_FAILED;
+    }
+
+    vos_mem_set( (tANI_U8 *)pMsgTdlsChanSwitch, sizeof(tpTdlsChanSwitchParams), 0);
+
+    pMsgTdlsChanSwitch->staIdx = pStaDs->staIndex;
+    pMsgTdlsChanSwitch->tdlsOffCh = pTdlsChanSwitch->tdlsOffCh;
+    pMsgTdlsChanSwitch->tdlsOffChBwOffset = pTdlsChanSwitch->tdlsOffChBwOffset;
+    pMsgTdlsChanSwitch->tdlsSwMode = pTdlsChanSwitch->tdlsSwMode;
+    pMsgTdlsChanSwitch->operClass = limGetOPClassFromChannel(
+                                           pMac->scan.countryCodeCurrent,
+                                           pTdlsChanSwitch->tdlsOffCh,
+                                           pTdlsChanSwitch->tdlsOffChBwOffset);
+    if(pMsgTdlsChanSwitch->operClass == 0)
+    {
+
+        VOS_TRACE(VOS_MODULE_ID_PE, VOS_TRACE_LEVEL_ERROR,
+                                   "Invalid Operating class 0 !!!");
+        goto lim_tdls_chan_switch_error;
+    }
+    else
+    {
+
+        VOS_TRACE(VOS_MODULE_ID_PE, VOS_TRACE_LEVEL_INFO,
+              "%s: TDLS Channel Switch params: staIdx %d class %d ch %d bw %d mode %d",
+               __func__,
+               pMsgTdlsChanSwitch->staIdx,
+               pMsgTdlsChanSwitch->operClass,
+               pMsgTdlsChanSwitch->tdlsOffCh,
+               pMsgTdlsChanSwitch->tdlsOffChBwOffset,
+               pMsgTdlsChanSwitch->tdlsSwMode);
+    }
+
+    msg.type = WDA_SET_TDLS_CHAN_SWITCH_REQ;
+    msg.reserved = 0;
+    msg.bodyptr = pMsgTdlsChanSwitch;
+    msg.bodyval = 0;
+    if(eSIR_SUCCESS != wdaPostCtrlMsg(pMac, &msg))
+    {
+        limLog(pMac, LOGE, FL("halPostMsgApi failed\n"));
+        goto lim_tdls_chan_switch_error;
+    }
+
+    return eSIR_SUCCESS;
+
+lim_tdls_chan_switch_error:
+    limSendSmeTdlsChanSwitchReqRsp(pMac, pTdlsChanSwitch->sessionId,
+                                   pTdlsChanSwitch->peerMac,
+                                   NULL, eSIR_FAILURE);
+    return eSIR_FAILURE;
+}
+

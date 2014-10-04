@@ -203,6 +203,7 @@ eHalStatus pmcStart (tHalHandle hHal)
     pMac->pmc.requestFullPowerPending = FALSE;
     pMac->pmc.uapsdSessionRequired = FALSE;
     pMac->pmc.wowlModeRequired = FALSE;
+    pMac->pmc.wowlExitSrc = eWOWL_EXIT_USER;
     pMac->pmc.bmpsRequestedByHdd = FALSE;
     pMac->pmc.remainInPowerActiveTillDHCP = FALSE;
     pMac->pmc.remainInPowerActiveThreshold = 0;
@@ -1348,6 +1349,20 @@ static void pmcProcessResponse( tpAniSirGlobal pMac, tSirSmeRsp *pMsg )
             {
                 pmcLog(pMac, LOGE, FL("Response message to request to exit "
                    "IMPS indicates failure, status %x"), pMsg->statusCode);
+                if (vos_is_logp_in_progress(VOS_MODULE_ID_SME, NULL))
+                {
+                    pmcLog(pMac, LOGE, FL("SSR Is in progress do not send "
+                                          "exit imps req again"));
+                }
+                else if( eHAL_STATUS_SUCCESS ==
+                      pmcSendMessage(pMac, eWNI_PMC_EXIT_IMPS_REQ, NULL, 0) )
+                {
+                    fRemoveCommand = eANI_BOOLEAN_FALSE;
+                    pMac->pmc.pmcState = REQUEST_FULL_POWER;
+                    pmcLog(pMac, LOGE, FL("eWNI_PMC_EXIT_IMPS_REQ sent again"
+                                          " to PE"));
+                    break;
+                }
             }
             pmcEnterFullPowerState(pMac);
         break;
@@ -1647,7 +1662,7 @@ tANI_BOOLEAN pmcValidateConnectState( tHalHandle hHal )
       pmcLog(pMac, LOGW, "PMC: BT-AMP exists. BMPS cannot be entered");
       return eANI_BOOLEAN_FALSE;
    }
-   if ((vos_concurrent_sessions_running()) &&
+   if ((vos_concurrent_open_sessions_running()) &&
        (csrIsConcurrentInfraConnected( pMac ) ||
        (vos_get_concurrency_mode()& VOS_SAP) ||
        (vos_get_concurrency_mode()& VOS_P2P_GO)))
@@ -1655,6 +1670,13 @@ tANI_BOOLEAN pmcValidateConnectState( tHalHandle hHal )
       pmcLog(pMac, LOGW, "PMC: Multiple active sessions exists. BMPS cannot be entered");
       return eANI_BOOLEAN_FALSE;
    }
+#ifdef FEATURE_WLAN_TDLS
+   if (pMac->isTdlsPowerSaveProhibited)
+   {
+      pmcLog(pMac, LOGE, FL("TDLS peer(s) connected/discovery sent. Dont enter BMPS"));
+      return eANI_BOOLEAN_FALSE;
+   }
+#endif
    return eANI_BOOLEAN_TRUE;
 }
 
@@ -1734,7 +1756,16 @@ eHalStatus pmcRequestBmps (
    status = pmcEnterBmpsCheck( pMac );
    if(HAL_STATUS_SUCCESS( status ))
    {
+      /* If DUT exits from WoWL because of wake-up indication then it enters
+       * into WoWL again. Disable WoWL only when user explicitly disables.
+       */
+      if(pMac->pmc.wowlModeRequired == FALSE && pMac->pmc.wowlExitSrc == eWOWL_EXIT_WAKEIND)
+      {
+          pMac->pmc.wowlModeRequired = TRUE;
+      }
+
       status = pmcEnterRequestBmpsState(hHal);
+
       /* Enter Request BMPS State. */
       if ( HAL_STATUS_SUCCESS( status ) )
       {
@@ -2164,8 +2195,12 @@ eHalStatus pmcWowlAddBcastPattern (
     {
        log_ptr->pattern_id = pattern->ucPatternId;
        log_ptr->pattern_byte_offset = pattern->ucPatternByteOffset;
-       log_ptr->pattern_size = pattern->ucPatternSize;
-       log_ptr->pattern_mask_size = pattern->ucPatternMaskSize;
+       log_ptr->pattern_size =
+           (pattern->ucPatternSize <= VOS_LOG_MAX_WOW_PTRN_SIZE) ?
+           pattern->ucPatternSize : VOS_LOG_MAX_WOW_PTRN_SIZE;
+       log_ptr->pattern_mask_size =
+          (pattern->ucPatternMaskSize <= VOS_LOG_MAX_WOW_PTRN_MASK_SIZE) ?
+           pattern->ucPatternMaskSize : VOS_LOG_MAX_WOW_PTRN_MASK_SIZE;
 
        vos_mem_copy(log_ptr->pattern, pattern->ucPattern, SIR_WOWL_BCAST_PATTERN_MAX_SIZE);
        /* 1 bit in the pattern mask denotes 1 byte of pattern hence pattern mask size is 1/8 */
@@ -2442,6 +2477,11 @@ eHalStatus pmcEnterWowl (
 
    pMac->pmc.wowlModeRequired = TRUE;
 
+   /* By default set wowlExitSrc to eWOWL_EXIT_WAKEIND, so that device will
+    * come out of WoWL only when user explicity disables WoWL.
+    */
+   pMac->pmc.wowlExitSrc = eWOWL_EXIT_WAKEIND;
+
    return eHAL_STATUS_PMC_PENDING;
 }
 
@@ -2451,11 +2491,13 @@ eHalStatus pmcEnterWowl (
             SME will initiate exit from WoWLAN mode and device will be put in BMPS
             mode.
     \param  hHal - The handle returned by macOpen.
+            wowlExitSrc - is wowl exiting because of wakeup pkt or user
+                          explicitly disabling WoWL
     \return eHalStatus
             eHAL_STATUS_FAILURE  Device cannot exit WoWLAN mode.
             eHAL_STATUS_SUCCESS  Request accepted to exit WoWLAN mode.
   ---------------------------------------------------------------------------*/
-eHalStatus pmcExitWowl (tHalHandle hHal)
+eHalStatus pmcExitWowl (tHalHandle hHal, tWowlExitSource wowlExitSrc)
 {
    tpAniSirGlobal pMac = PMAC_STRUCT(hHal);
 
@@ -2473,13 +2515,24 @@ eHalStatus pmcExitWowl (tHalHandle hHal)
    /* Clear any buffered command for entering WOWL */
    pMac->pmc.wowlModeRequired = FALSE;
 
+   /* are we exiting from WoW because of wake indication
+      or user disabling this feature */
+   pMac->pmc.wowlExitSrc = wowlExitSrc;
+
    /* Enter REQUEST_EXIT_WOWL State*/
    if (pmcRequestExitWowlState(hHal) != eHAL_STATUS_SUCCESS)
       return eHAL_STATUS_FAILURE;
 
-   /* Clear the callback routines */
-   pMac->pmc.enterWowlCallbackRoutine = NULL;
-   pMac->pmc.enterWowlCallbackContext = NULL;
+   if (eWOWL_EXIT_USER == wowlExitSrc)
+   {
+       /* Clear the callback routines */
+       pMac->pmc.enterWowlCallbackRoutine = NULL;
+       pMac->pmc.enterWowlCallbackContext = NULL;
+#ifdef WLAN_WAKEUP_EVENTS
+       pMac->pmc.wakeReasonIndCB = NULL;
+       pMac->pmc.wakeReasonIndCBContext = NULL;
+#endif
+   }
 
    return eHAL_STATUS_SUCCESS;
 }
@@ -2915,6 +2968,12 @@ eHalStatus pmcSetPreferredNetworkList
     tCsrRoamSession *pSession = CSR_GET_SESSION( pMac, sessionId );
     tANI_U8 ucDot11Mode;
 
+    if (NULL == pSession)
+    {
+        VOS_TRACE(VOS_MODULE_ID_SME, VOS_TRACE_LEVEL_ERROR,
+                  "%s: pSession is NULL", __func__);
+        return eHAL_STATUS_FAILURE;
+    }
     VOS_TRACE( VOS_MODULE_ID_SME, VOS_TRACE_LEVEL_INFO,
                "%s: SSID = 0x%08lx%08lx%08lx%08lx%08lx%08lx%08lx%08lx, "
                "0x%08lx%08lx%08lx%08lx%08lx%08lx%08lx%08lx", __func__,
@@ -2934,7 +2993,12 @@ eHalStatus pmcSetPreferredNetworkList
                *((v_U32_t *) &pRequest->aNetworks[1].ssId.ssId[20]),
                *((v_U32_t *) &pRequest->aNetworks[1].ssId.ssId[24]),
                *((v_U32_t *) &pRequest->aNetworks[1].ssId.ssId[28]));
-
+    if (!pSession)
+    {
+        VOS_TRACE(VOS_MODULE_ID_SME, VOS_TRACE_LEVEL_ERROR,
+            "%s: pSessionis NULL", __func__);
+        return eHAL_STATUS_FAILURE;
+    }
 
     pRequestBuf = vos_mem_malloc(sizeof(tSirPNOScanReq));
     if (NULL == pRequestBuf)
@@ -2973,8 +3037,8 @@ eHalStatus pmcSetPreferredNetworkList
         else
         {
             VOS_TRACE(VOS_MODULE_ID_SME, VOS_TRACE_LEVEL_INFO,
-                   "%s: Extra ie discarded on 2.4G, IE length = %d", __func__,
-                    pRequest->us24GProbeTemplateLen);
+                   "%s: Extra ie discarded on 2.4G, IE length = %d Max IE length is %d",
+                   __func__, pRequest->us24GProbeTemplateLen, SIR_PNO_MAX_PB_REQ_SIZE);
         }
     }
 
@@ -3000,8 +3064,8 @@ eHalStatus pmcSetPreferredNetworkList
         else
         {
             VOS_TRACE(VOS_MODULE_ID_SME, VOS_TRACE_LEVEL_INFO,
-                   "%s: Extra IE discarded on 5G, IE length = %d", __func__,
-                    pRequest->us5GProbeTemplateLen);
+                   "%s: Extra IE discarded on 5G, IE length = %d Max IE length is %d",
+                    __func__, pRequest->us5GProbeTemplateLen, SIR_PNO_MAX_PB_REQ_SIZE);
         }
     }
 
@@ -3030,7 +3094,7 @@ eHalStatus pmcSetRssiFilter(tHalHandle hHal,   v_U8_t        rssiThreshold)
     vos_msg_t msg;
 
 
-    pRequestBuf = vos_mem_malloc(sizeof(tpSirSetRSSIFilterReq));
+    pRequestBuf = vos_mem_malloc(sizeof(tSirSetRSSIFilterReq));
     if (NULL == pRequestBuf)
     {
         VOS_TRACE(VOS_MODULE_ID_SME, VOS_TRACE_LEVEL_ERROR, "%s: Not able to allocate memory for PNO request", __func__);

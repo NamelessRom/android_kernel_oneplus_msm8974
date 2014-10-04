@@ -235,7 +235,7 @@ void *wpalDmaMemoryAllocate(wpt_uint32 size, void **ppPhysicalAddr)
    if ( NULL == pv ) 
    {
      WPAL_TRACE(eWLAN_MODULE_PAL, eWLAN_PAL_TRACE_LEVEL_ERROR, 
-                 "%s Unable to allocate DMA buffer\n", __func__);
+                 "%s Unable to allocate DMA buffer", __func__);
      return NULL;
    }
 
@@ -460,7 +460,7 @@ void wpalFwDumpReq(wpt_uint32 cmd, wpt_uint32 arg1, wpt_uint32 arg2,
 ---------------------------------------------------------------------------*/
 void wpalDevicePanic(void)
 {
-   BUG_ON(0);
+   BUG_ON(1);
    return;
 }
 /*---------------------------------------------------------------------------
@@ -474,5 +474,18 @@ void wpalDevicePanic(void)
 int  wpalIsWDresetInProgress(void)
 {
    return isWDresetInProgress();
+}
+
+/*---------------------------------------------------------------------------
+    wpalIsSsrPanicOnFailure -  calls vos API isSsrPanicOnFailure()
+
+    Param:
+       NONE
+    Return:
+       STATUS
+ ---------------------------------------------------------------------------*/
+int  wpalIsSsrPanicOnFailure(void)
+{
+   return isSsrPanicOnFailure();
 }
 

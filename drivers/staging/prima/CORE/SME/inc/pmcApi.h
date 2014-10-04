@@ -76,8 +76,6 @@
 #define PMC_IS_CHIP_ACCESSIBLE(pmcState) ( (IMPS != (pmcState)) && (REQUEST_IMPS != (pmcState)) && \
        (STANDBY != (pmcState)) && (REQUEST_STANDBY != (pmcState)) )
 
-
-
 /* Power events that are signaled to PMC. */
 
 typedef enum ePmcPowerEvent
@@ -197,7 +195,6 @@ typedef enum ePmcState
 
 } tPmcState;
 
-
 /* Which beacons should be forwarded to the host. */
 
 typedef enum ePmcBeaconsToForward
@@ -231,8 +228,11 @@ typedef enum ePmcSmpsMode
 
 } tPmcSmpsMode;
 
-
-
+typedef enum
+{
+    eWOWL_EXIT_USER,
+    eWOWL_EXIT_WAKEIND
+}tWowlExitSource;
 
 /* Configuration parameters for Idle Mode Power Save (IMPS). */
 
@@ -313,7 +313,6 @@ typedef struct sPmcSmpsConfigParams
 
 
 /* Routine definitions. */
-
 extern eHalStatus pmcOpen (tHalHandle hHal);
 
 extern eHalStatus pmcStart (tHalHandle hHal);
@@ -436,7 +435,7 @@ extern eHalStatus pmcEnterWowl (
 #endif // WLAN_WAKEUP_EVENTS
     tpSirSmeWowlEnterParams wowlEnterParams, tANI_U8 sessionId);
 
-extern eHalStatus pmcExitWowl (tHalHandle hHal);
+extern eHalStatus pmcExitWowl (tHalHandle hHal, tWowlExitSource wowlExitSrc);
 
 
 extern eHalStatus pmcSetHostOffload (tHalHandle hHal, tpSirHostOffloadReq pRequest,

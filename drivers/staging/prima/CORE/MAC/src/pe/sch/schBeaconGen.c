@@ -151,12 +151,14 @@ tSirRetStatus schAppendAddnIE(tpAniSirGlobal pMac, tpPESession psessionEntry,
                     noaLen = limGetNoaAttrStream(pMac, noaStream, psessionEntry);
                     if(noaLen)
                     {
-                        if(noaLen + len <= WNI_CFG_PROBE_RSP_BCN_ADDNIE_DATA_LEN)
+                        if ( (noaLen + len) <= WNI_CFG_PROBE_RSP_BCN_ADDNIE_DATA_LEN )
                         {
                             vos_mem_copy(&addIE[len], noaStream, noaLen);
                             len += noaLen;
                             /* Update IE Len */
                             pP2pIe[1] += noaLen;
+                            schLog(pMac, LOG1,
+                                FL("NoA length is %d"),noaLen);
                         }
                         else
                         {
@@ -167,6 +169,8 @@ tSirRetStatus schAppendAddnIE(tpAniSirGlobal pMac, tpPESession psessionEntry,
                 }
                 vos_mem_copy(pFrame, &addIE[0], len);
                 *nBytes = *nBytes + len;
+                schLog(pMac, LOG1,
+                    FL("Total beacon size is %d"), *nBytes);
             }
         }
     }
@@ -353,28 +357,15 @@ tSirRetStatus schSetFixedBeaconFields(tpAniSirGlobal pMac,tpPESession psessionEn
     if(psessionEntry->vhtCapability)
     {        
         schLog( pMac, LOGW, FL("Populate VHT IEs in Beacon"));
-        PopulateDot11fVHTCaps( pMac, &pBcn2->VHTCaps );
+        PopulateDot11fVHTCaps( pMac, &pBcn2->VHTCaps, eSIR_TRUE );
         PopulateDot11fVHTOperation( pMac, &pBcn2->VHTOperation);
         // we do not support multi users yet
         //PopulateDot11fVHTExtBssLoad( pMac, &bcn2.VHTExtBssLoad);
-        PopulateDot11fExtCap( pMac, &pBcn2->ExtCap);
+        PopulateDot11fExtCap( pMac, &pBcn2->ExtCap, psessionEntry);
         if(psessionEntry->gLimOperatingMode.present)
             PopulateDot11fOperatingMode( pMac, &pBcn2->OperatingMode, psessionEntry );
     }
 #endif
-
-    if (psessionEntry->oxygenNwkIniFeatureEnabled &&
-       (eLIM_STA_IN_IBSS_ROLE == psessionEntry->limSystemRole)) {
-        if ((status = wlan_cfgGetInt(pMac, WNI_CFG_OXYGEN_NETWORK_DATA,
-                                     &tmp)) != eSIR_SUCCESS)
-        {
-            limLog(pMac, LOGW, FL("Unable to get WNI_CFG_OXYGEN_NETWORK_DATA"));
-        }
-        else {
-            pBcn2->OxygenNetwork.present = 1;
-            pBcn2->OxygenNetwork.data = (tmp & 0xffff);
-        }
-    }
 
     PopulateDot11fExtSuppRates( pMac, POPULATE_DOT11F_RATES_OPERATIONAL,
                                 &pBcn2->ExtSuppRates, psessionEntry );

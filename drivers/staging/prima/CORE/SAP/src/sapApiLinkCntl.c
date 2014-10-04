@@ -158,9 +158,6 @@ WLANSAP_ScanCallback
     tWLAN_SAPEvent sapEvent; /* State machine event */
     v_U8_t operChannel = 0;
     VOS_STATUS sapstatus;
-#ifdef SOFTAP_CHANNEL_RANGE
-    v_U32_t operatingBand;
-#endif
 
     /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
 
@@ -211,13 +208,8 @@ WLANSAP_ScanCallback
        {
          /* if the channel list is empty then there is no valid channel in 
                 the selected sub-band so select default channel in the 
-                BAND(2.4GHz/5GHZ) */
-          ccmCfgGetInt( halHandle, WNI_CFG_SAP_CHANNEL_SELECT_OPERATING_BAND, &operatingBand);
-          if(RF_SUBBAND_2_4_GHZ == operatingBand )
+                BAND(2.4GHz) as 2.4 channels are available in all the countries*/
               psapContext->channel = SAP_DEFAULT_CHANNEL;
-          else
-              psapContext->channel = SAP_DEFAULT_5GHZ_CHANNEL;
-         
        }
     }
 #else
@@ -411,8 +403,8 @@ WLANSAP_RoamCallback
         case eCSR_ROAM_SEND_ACTION_CNF:
             sapSignalHDDevent(sapContext, pCsrRoamInfo, 
                             eSAP_SEND_ACTION_CNF, 
-                            (v_PVOID_t)(( roamResult == eCSR_ROAM_RESULT_NONE) ?
-                            eSAP_STATUS_SUCCESS : eSAP_STATUS_FAILURE));
+                            (v_PVOID_t)((eSapStatus)((roamResult == eCSR_ROAM_RESULT_NONE)
+                            ? eSAP_STATUS_SUCCESS : eSAP_STATUS_FAILURE)));
             break;
 
        case eCSR_ROAM_DISCONNECT_ALL_P2P_CLIENTS:
