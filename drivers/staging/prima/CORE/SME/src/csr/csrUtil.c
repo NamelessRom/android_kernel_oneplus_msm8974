@@ -93,7 +93,7 @@ tANI_U8 csrRSNOui[][ CSR_RSN_OUI_SIZE ] = {
 };
 
 #ifdef FEATURE_WLAN_WAPI
-tANI_U8 csrWapiOui[][ CSR_WAPI_OUI_SIZE ] = {
+tANI_U8 csrWapiOui[CSR_WAPI_OUI_ROW_SIZE][ CSR_WAPI_OUI_SIZE ] = {
     { 0x00, 0x14, 0x72, 0x00 }, // Reserved
     { 0x00, 0x14, 0x72, 0x01 }, // WAI certificate or SMS4
     { 0x00, 0x14, 0x72, 0x02 } // WAI PSK
@@ -1451,6 +1451,20 @@ tANI_U8 csrGetInfraOperationChannel( tpAniSirGlobal pMac, tANI_U8 sessionId)
     return channel;
 }
 
+tANI_BOOLEAN csrIsSessionClientAndConnected(tpAniSirGlobal pMac, tANI_U8 sessionId)
+{
+    tCsrRoamSession *pSession = NULL;
+    if ( CSR_IS_SESSION_VALID( pMac, sessionId) && csrIsConnStateInfra( pMac, sessionId))
+    {
+        pSession = CSR_GET_SESSION( pMac, sessionId);
+        if ((pSession->pCurRoamProfile->csrPersona == VOS_STA_MODE) ||
+           (pSession->pCurRoamProfile->csrPersona == VOS_P2P_CLIENT_MODE))
+        {
+           return TRUE;
+        }
+    }
+    return FALSE;
+}
 //This routine will return operating channel on FIRST BSS that is active/operating to be used for concurrency mode.
 //If other BSS is not up or not connected it will return 0 
 
@@ -3134,7 +3148,7 @@ eHalStatus csrValidateMCCBeaconInterval(tpAniSirGlobal pMac, tANI_U8 channelId,
                 break;
 
                 default :
-                    smsLog(pMac, LOG1, FL(" Persona not supported : %d"),currBssPersona);
+                    smsLog(pMac, LOGE, FL(" Persona not supported : %d"),currBssPersona);
                     return eHAL_STATUS_FAILURE;
             }
         }
@@ -3303,7 +3317,11 @@ static tANI_BOOLEAN csrMatchWapiOUIIndex( tpAniSirGlobal pMac, tANI_U8 AllCypher
                                             tANI_U8 cAllCyphers, tANI_U8 ouiIndex,
                                             tANI_U8 Oui[] )
 {
-    return( csrIsWapiOuiMatch( pMac, AllCyphers, cAllCyphers, csrWapiOui[ouiIndex], Oui ) );
+    if (ouiIndex < CSR_WAPI_OUI_ROW_SIZE)// since csrWapiOui row size is 3 .
+          return( csrIsWapiOuiMatch( pMac, AllCyphers, cAllCyphers,
+                                     csrWapiOui[ouiIndex], Oui ) );
+    else
+          return FALSE ;
 
 }
 #endif /* FEATURE_WLAN_WAPI */
@@ -5833,11 +5851,10 @@ void csrReleaseProfile(tpAniSirGlobal pMac, tCsrRoamProfile *pProfile)
             pProfile->pWAPIReqIE = NULL;
         }
 #endif /* FEATURE_WLAN_WAPI */
-
-        if(pProfile->pAddIEScan)
+        if (pProfile->nAddIEScanLength)
         {
-            palFreeMemory(pMac->hHdd, pProfile->pAddIEScan);
-            pProfile->pAddIEScan = NULL;
+           memset(pProfile->addIEScan, 0 , SIR_MAC_MAX_IE_LENGTH+2);
+           pProfile->nAddIEScanLength = 0;
         }
 
         if(pProfile->pAddIEAssoc)
@@ -6158,7 +6175,7 @@ v_CountryInfoSource_t source
         }
         else
         {
-            smsLog(pMac, LOGW, FL("  doesn't match country %c%c"), pCountry[0], pCountry[1]);
+            smsLog(pMac, LOGW, FL(" Couldn't find domain for country code  %c%c"), pCountry[0], pCountry[1]);
             status = eHAL_STATUS_INVALID_PARAMETER;
         }
     }

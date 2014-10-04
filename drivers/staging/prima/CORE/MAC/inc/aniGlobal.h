@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2013, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012-2014, The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -220,9 +220,6 @@ typedef struct sLimTimers
     // CNF_WAIT timer
     TX_TIMER            *gpLimCnfWaitTimer;
 
-    // Send Disassociate frame threshold parameters
-    TX_TIMER            gLimSendDisassocFrameThresholdTimer;
-
     TX_TIMER       gLimAddtsRspTimer;   // max wait for a response
 
     // Update OLBC Cache Timer
@@ -245,7 +242,6 @@ typedef struct sLimTimers
 #ifdef FEATURE_WLAN_CCX
     TX_TIMER           gLimCcxTsmTimer;
 #endif
-    TX_TIMER           gLimRemainOnChannelTimer;
 #ifdef FEATURE_WLAN_TDLS_INTERNAL
     TX_TIMER           gLimTdlsDisRspWaitTimer;
     TX_TIMER           gLimTdlsLinkSetupRspTimeouTimer;
@@ -463,6 +459,8 @@ typedef struct sAniSirLim
 
     // Heart-Beat interval value
     tANI_U32   gLimHeartBeatCount;
+    tSirMacAddr gLimHeartBeatApMac[2];
+    tANI_U8 gLimHeartBeatApMacIndex;
 
     // Statistics to keep track of no. beacons rcvd in heart beat interval
     tANI_U16            gLimHeartBeatBeaconStats[MAX_NO_BEACONS_PER_HEART_BEAT_INTERVAL];
@@ -714,10 +712,6 @@ typedef struct sAniSirLim
     // Place holder for Pre-authentication node list
     struct tLimPreAuthNode *  pLimPreAuthList;
 
-    // Send Disassociate frame threshold parameters
-    tANI_U16            gLimDisassocFrameThreshold;
-    tANI_U16            gLimDisassocFrameCredit;
-
     // Assoc or ReAssoc Response Data/Frame
     void                *gLimAssocResponseData;
 
@@ -925,6 +919,15 @@ tLimMlmOemDataRsp       *gpLimMlmOemDataRsp;
     tSirDFSChannelList    dfschannelList;
     tANI_U8 deauthMsgCnt;
     tANI_U8 gLimIbssStaLimit;
+    // Flag to debug remain on channel
+    tANI_BOOLEAN gDebugP2pRemainOnChannel;
+    /* Sequence number to keep track of
+     * start and end of remain on channel
+     * debug marker frame.
+     */
+    tANI_U32 remOnChnSeqNum;
+    tANI_U8 probeCounter;
+    tANI_U8 maxProbe;
 } tAniSirLim, *tpAniSirLim;
 
 typedef struct sLimMgmtFrameRegistration
@@ -1064,6 +1067,10 @@ typedef struct sAniSirGlobal
     v_BOOL_t isTdlsPowerSaveProhibited;
 #endif
     tANI_U8 fScanOffload;
+    tANI_U32 fEnableDebugLog;
+    tANI_U8 isCoalesingInIBSSAllowed;
+    tANI_U32 fDeferIMPSTime;
+    tANI_BOOLEAN deferImps;
 } tAniSirGlobal;
 
 #ifdef FEATURE_WLAN_TDLS

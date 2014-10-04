@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2013, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012-2014, The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -122,6 +122,7 @@ typedef struct sRrmSMEContext
 #if defined(FEATURE_WLAN_CCX) && defined(FEATURE_WLAN_CCX_UPLOAD)
    tCsrCcxBeaconReq  ccxBcnReqInfo;
 #endif /* FEATURE_WLAN_CCX && FEATURE_WLAN_CCX_UPLOAD */
+   tRrmMsgReqSource msgSource;
 }tRrmSMEContext, *tpRrmSMEContext; 
 
 typedef struct sRrmNeighborReq

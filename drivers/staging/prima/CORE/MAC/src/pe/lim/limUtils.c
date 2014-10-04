@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2013, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012-2014 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -39,6 +39,7 @@
  * PERFORMANCE OF THIS SOFTWARE.
  */
 
+
 /*
  * Airgo Networks, Inc proprietary. All rights reserved.
  * This file limUtils.cc contains the utility functions
@@ -60,6 +61,7 @@
 #include "limAdmitControl.h"
 #include "limStaHashApi.h"
 #include "dot11f.h"
+#include "dot11fdefs.h"
 #include "wmmApsd.h"
 #include "limTrace.h"
 #ifdef FEATURE_WLAN_DIAG_SUPPORT
@@ -78,17 +80,26 @@ static tAniBool glimTriggerBackgroundScanDuringQuietBss_Status = eSIR_TRUE;
 
 /* 11A Channel list to decode RX BD channel information */
 static const tANI_U8 abChannel[]= {36,40,44,48,52,56,60,64,100,104,108,112,116,
-            120,124,128,132,136,140,149,153,157,161,165};
+            120,124,128,132,136,140,149,153,157,161,165,144};
+#define abChannelSize (sizeof(abChannel)/  \
+        sizeof(abChannel[0]))
 
 #ifdef WLAN_FEATURE_ROAM_SCAN_OFFLOAD
 static const tANI_U8 aUnsortedChannelList[]= {52,56,60,64,100,104,108,112,116,
-            120,124,128,132,136,140,36,40,44,48,149,153,157,161,165};
+            120,124,128,132,136,140,36,40,44,48,149,153,157,161,165,144};
+#define aUnsortedChannelListSize (sizeof(aUnsortedChannelList)/  \
+        sizeof(aUnsortedChannelList[0]))
 #endif
 
-//#define LIM_MAX_ACTIVE_SESSIONS 3  //defined temporarily for BT-AMP SUPPORT 
+//#define LIM_MAX_ACTIVE_SESSIONS 3  //defined temporarily for BT-AMP SUPPORT
 #define SUCCESS 1                   //defined temporarily for BT-AMP
 
 #define MAX_BA_WINDOW_SIZE_FOR_CISCO 25
+
+static void
+limProcessChannelSwitchSuspendLink(tpAniSirGlobal pMac,
+                                    eHalStatus status,
+                                    tANI_U32 *ctx);
 /** -------------------------------------------------------------
 \fn limAssignDialogueToken
 \brief Assigns dialogue token.
@@ -615,8 +626,6 @@ char *limMsgStr(tANI_U32 msgType)
             return "SIR_LIM_CHANNEL_SCAN_TIMEOUT";
         case SIR_LIM_LINK_TEST_DURATION_TIMEOUT:
             return "SIR_LIM_LINK_TEST_DURATION_TIMEOUT";
-        case SIR_LIM_HASH_MISS_THRES_TIMEOUT:
-            return "SIR_LIM_HASH_MISS_THRES_TIMEOUT";
         case SIR_LIM_KEEPALIVE_TIMEOUT:
             return "SIR_LIM_KEEPALIVE_TIMEOUT";
         case SIR_LIM_UPDATE_OLBC_CACHEL_TIMEOUT:
@@ -1063,12 +1072,6 @@ limCleanupMlm(tpAniSirGlobal pMac)
             tx_timer_delete(&pAuthNode->timer);
         }
 
-
-
-        // Deactivate and delete Hash Miss throttle timer
-        tx_timer_deactivate(&pMac->lim.limTimers.gLimSendDisassocFrameThresholdTimer);
-        tx_timer_delete(&pMac->lim.limTimers.gLimSendDisassocFrameThresholdTimer);
-
         tx_timer_deactivate(&pMac->lim.limTimers.gLimUpdateOlbcCacheTimer);
         tx_timer_delete(&pMac->lim.limTimers.gLimUpdateOlbcCacheTimer);
         tx_timer_deactivate(&pMac->lim.limTimers.gLimPreAuthClnupTimer);
@@ -1091,9 +1094,6 @@ limCleanupMlm(tpAniSirGlobal pMac)
         tx_timer_delete(&pMac->lim.limTimers.gLimFTPreAuthRspTimer);
 #endif
 
-        // Deactivate and delete remain on channel timer
-        tx_timer_deactivate(&pMac->lim.limTimers.gLimRemainOnChannelTimer);
-        tx_timer_delete(&pMac->lim.limTimers.gLimRemainOnChannelTimer);
 
 #if defined(FEATURE_WLAN_CCX) && !defined(FEATURE_WLAN_CCX_UPLOAD)
         // Deactivate and delete TSM
@@ -1745,27 +1745,13 @@ limIsNullSsid( tSirMacSSid *pSsid )
         }
 
 #define ASCII_SPACE_CHARACTER 0x20
-        /* If the first charactes is space, then check if all characters in 
-         * SSID are spaces to consider it as NULL SSID*/
-        if( ASCII_SPACE_CHARACTER == pSsid->ssId[0])
+        /* If the first charactes is space and SSID length is 1
+         * then consider it as NULL SSID*/
+        if ((ASCII_SPACE_CHARACTER == pSsid->ssId[0]) &&
+            (pSsid->length == 1))
         {
-            SsidLength = pSsid->length;
-            pSsidStr = pSsid->ssId;
-            /* check if all the charactes in SSID are spaces*/
-            while ( SsidLength )
-            {
-                if( ASCII_SPACE_CHARACTER != *pSsidStr )
-                    break;
-    
-                pSsidStr++;
-                SsidLength--;
-            }
-    
-            if( 0 == SsidLength )
-            {
-                fNullSsid = true;
-                break;
-            }
+             fNullSsid = true;
+             break;
         }
         else
         {
@@ -2609,9 +2595,21 @@ void limProcessChannelSwitchTimeout(tpAniSirGlobal pMac)
     switch(psessionEntry->gLimChannelSwitch.state)
     {
         case eLIM_CHANNEL_SWITCH_PRIMARY_ONLY:
-            PELOGW(limLog(pMac, LOGW, FL("CHANNEL_SWITCH_PRIMARY_ONLY "));)
-            limSwitchPrimaryChannel(pMac, psessionEntry->gLimChannelSwitch.primaryChannel,psessionEntry);
-            psessionEntry->gLimChannelSwitch.state = eLIM_CHANNEL_SWITCH_IDLE;
+        case eLIM_CHANNEL_SWITCH_PRIMARY_AND_SECONDARY:
+            if ( isLimSessionOffChannel(pMac,
+                pMac->lim.limTimers.gLimChannelSwitchTimer.sessionId) )
+            {
+                limSuspendLink(pMac,
+                    eSIR_DONT_CHECK_LINK_TRAFFIC_BEFORE_SCAN,
+                    limProcessChannelSwitchSuspendLink,
+                    (tANI_U32*)psessionEntry );
+            }
+            else
+            {
+                limProcessChannelSwitchSuspendLink(pMac,
+                    eHAL_STATUS_SUCCESS,
+                    (tANI_U32*)psessionEntry);
+            }
             break;
 
         case eLIM_CHANNEL_SWITCH_SECONDARY_ONLY:
@@ -2621,15 +2619,6 @@ void limProcessChannelSwitchTimeout(tpAniSirGlobal pMac)
                                              psessionEntry->gLimChannelSwitch.secondarySubBand);
             psessionEntry->gLimChannelSwitch.state = eLIM_CHANNEL_SWITCH_IDLE;
             break;
-
-        case eLIM_CHANNEL_SWITCH_PRIMARY_AND_SECONDARY:
-            PELOGW(limLog(pMac, LOGW, FL("CHANNEL_SWITCH_PRIMARY_AND_SECONDARY"));)
-            limSwitchPrimarySecondaryChannel(pMac, psessionEntry,
-                                             psessionEntry->gLimChannelSwitch.primaryChannel,
-                                             psessionEntry->gLimChannelSwitch.secondarySubBand);
-            psessionEntry->gLimChannelSwitch.state = eLIM_CHANNEL_SWITCH_IDLE;
-            break;
-
         case eLIM_CHANNEL_SWITCH_IDLE:
         default:
             PELOGE(limLog(pMac, LOGE, FL("incorrect state "));)
@@ -2743,6 +2732,8 @@ limUpdateChannelSwitch(struct sAniSirGlobal *pMac,  tpSirProbeRespBeacon pBeacon
             }
         }
      }
+
+
     if (eSIR_SUCCESS != limStartChannelSwitch(pMac, psessionEntry))
     {
         PELOGW(limLog(pMac, LOGW, FL("Could not start Channel Switch"));)
@@ -5098,7 +5089,6 @@ void limTxComplete( tHalHandle hHal, void *pData )
         if(VOS_IS_STATUS_SUCCESS(vosStatus))
         {
             mHdr = WDA_GET_RX_MAC_HEADER(pRxBd);
-            MTRACE(macTrace(pMac, TRACE_CODE_TX_COMPLETE, NO_SESSION, mHdr->fc.subType);)
 
         }   
     }
@@ -5151,6 +5141,26 @@ void limUpdateStaRunTimeHTSwitchChnlParams( tpAniSirGlobal   pMac,
         return;
     }
 #endif
+
+    if (pMac->ft.ftPEContext.pFTPreAuthReq)
+    {
+        limLog( pMac, LOGE, FL( "FT PREAUTH channel change is in progress"));
+        return;
+    }
+
+    /*
+     * Do not try to switch channel if RoC is in progress. RoC code path uses
+     * pMac->lim.gpLimRemainOnChanReq to notify the upper layers that the device
+     * has started listening on the channel requested as part of RoC, if we set
+     * pMac->lim.gpLimRemainOnChanReq to NULL as we do below then the
+     * upper layers will think that the channel change is not successful and the
+     * RoC from the upper layer perspective will never end...
+     */
+    if (pMac->lim.gpLimRemainOnChanReq)
+    {
+        limLog( pMac, LOGE, FL( "RoC is in progress"));
+        return;
+    }
 
     if ( psessionEntry->htSecondaryChannelOffset != ( tANI_U8 ) pHTInfo->secondaryChannelOffset ||
          psessionEntry->htRecommendedTxWidthSet  != ( tANI_U8 ) pHTInfo->recommendedTxWidthSet )
@@ -7224,8 +7234,9 @@ void limHandleHeartBeatFailureTimeout(tpAniSirGlobal pMac)
 #endif
                 if (psessionEntry->limMlmState == eLIM_MLM_LINK_ESTABLISHED_STATE)
                 {
-                    if ((!LIM_IS_CONNECTION_ACTIVE(psessionEntry))&&
-                                                  (psessionEntry->limSmeState != eLIM_SME_WT_DISASSOC_STATE))
+                    if ((!LIM_IS_CONNECTION_ACTIVE(psessionEntry)) &&
+                        (psessionEntry->limSmeState != eLIM_SME_WT_DISASSOC_STATE)&&
+                        (psessionEntry->limSmeState != eLIM_SME_WT_DEAUTH_STATE))
                     {
                         limLog(pMac, LOGE, FL("Probe_hb_failure: for session:%d " ),psessionEntry->peSessionId);
                         /* AP did not respond to Probe Request. Tear down link with it.*/
@@ -7435,11 +7446,13 @@ void limProcessDelStaSelfRsp(tpAniSirGlobal pMac,tpSirMsgQ limMsgQ)
 *****************************************************************/
 tANI_U8 limUnmapChannel(tANI_U8 mapChannel)
 {
-   if( mapChannel > 0 && mapChannel < 25 )
 #ifdef WLAN_FEATURE_ROAM_SCAN_OFFLOAD
+   if( mapChannel > 0 && mapChannel <= aUnsortedChannelListSize )
        if (IS_ROAM_SCAN_OFFLOAD_FEATURE_ENABLE)
            return aUnsortedChannelList[mapChannel -1];
        else
+#else
+   if( mapChannel > 0 && mapChannel <= abChannelSize )
 #endif
      return abChannel[mapChannel -1];
    else
@@ -7731,6 +7744,7 @@ tANI_U8 limGetShortSlotFromPhyMode(tpAniSirGlobal pMac, tpPESession psessionEntr
     else if (phyMode == WNI_CFG_PHY_MODE_11G)
     {
         if ((psessionEntry->pePersona == VOS_STA_SAP_MODE) ||
+            (psessionEntry->pePersona == VOS_IBSS_MODE) ||
             (psessionEntry->pePersona == VOS_P2P_GO_MODE))
         {
             val = true;
@@ -7752,4 +7766,132 @@ tANI_U8 limGetShortSlotFromPhyMode(tpAniSirGlobal pMac, tpPESession psessionEntr
     }
     limLog(pMac, LOG1, FL("phyMode = %u shortslotsupported = %u"), phyMode, val);
     return val;
+}
+
+void limUtilsframeshtons(tpAniSirGlobal    pCtx,
+                            tANI_U8  *pOut,
+                            tANI_U16  pIn,
+                            tANI_U8  fMsb)
+{
+    (void)pCtx;
+#if defined ( DOT11F_LITTLE_ENDIAN_HOST )
+    if ( !fMsb )
+    {
+        DOT11F_MEMCPY(pCtx, pOut, &pIn, 2);
+    }
+    else
+    {
+        *pOut         = ( pIn & 0xff00 ) >> 8;
+        *( pOut + 1 ) = pIn & 0xff;
+    }
+#else
+    if ( !fMsb )
+    {
+        *pOut         = pIn & 0xff;
+        *( pOut + 1 ) = ( pIn & 0xff00 ) >> 8;
+    }
+    else
+    {
+        DOT11F_MEMCPY(pCtx, pOut, &pIn, 2);
+    }
+#endif
+}
+
+void limUtilsframeshtonl(tpAniSirGlobal    pCtx,
+                        tANI_U8  *pOut,
+                        tANI_U32  pIn,
+                        tANI_U8  fMsb)
+{
+    (void)pCtx;
+#if defined ( DOT11F_LITTLE_ENDIAN_HOST )
+    if ( !fMsb )
+    {
+        DOT11F_MEMCPY(pCtx, pOut, &pIn, 4);
+    }
+    else
+    {
+        *pOut         = ( pIn & 0xff000000 ) >> 24;
+        *( pOut + 1 ) = ( pIn & 0x00ff0000 ) >> 16;
+        *( pOut + 2 ) = ( pIn & 0x0000ff00 ) >>  8;
+        *( pOut + 3 ) = ( pIn & 0x000000ff );
+    }
+#else
+    if ( !fMsb )
+    {
+        *( pOut     ) = ( pIn & 0x000000ff );
+        *( pOut + 1 ) = ( pIn & 0x0000ff00 ) >>  8;
+        *( pOut + 2 ) = ( pIn & 0x00ff0000 ) >> 16;
+        *( pOut + 3 ) = ( pIn & 0xff000000 ) >> 24;
+    }
+    else
+    {
+        DOT11F_MEMCPY(pCtx, pOut, &pIn, 4);
+    }
+#endif
+}
+
+/** ---------------------------------------------------------
+\fn  limProcessChannelSwitchSuspendLink
+\brief   This function call channel switch functions based on
+         the gLimChannelSwitch.state. After function return it
+         reset the state to eLIM_CHANNEL_SWITCH_IDLE.
+         If gLimChannelSwitch.state is non-identified then
+         print error log as well as restore back the
+         pre-channelSwitch.
+\param   tpAniSirGlobal  pMac
+\param   eHalStatus   status
+\param   tANI_U32        *ctx
+\return  None
+ ------------------------------------------------------------*/
+static void
+limProcessChannelSwitchSuspendLink(tpAniSirGlobal pMac,
+                                    eHalStatus status,
+                                    tANI_U32 *ctx)
+{
+    tpPESession         pSessionEntry = (tpPESession)ctx;
+
+    if ( eHAL_STATUS_SUCCESS != status )
+    {
+        limLog(pMac, LOGE,
+            FL("Suspend link failed. still proceeding "));
+    }
+    if (NULL == pSessionEntry )
+    {
+        limLog(pMac, LOGE, FL("pSessionEntry is null pointer "));
+        return;
+    }
+
+    switch(pSessionEntry->gLimChannelSwitch.state)
+    {
+        case eLIM_CHANNEL_SWITCH_PRIMARY_ONLY:
+            PELOGW(limLog(pMac, LOGW,
+                FL("CHANNEL_SWITCH_PRIMARY_ONLY "));)
+            limSwitchPrimaryChannel(pMac,
+                pSessionEntry->gLimChannelSwitch.primaryChannel,
+                pSessionEntry);
+            pSessionEntry->gLimChannelSwitch.state =
+                eLIM_CHANNEL_SWITCH_IDLE;
+            break;
+
+        case eLIM_CHANNEL_SWITCH_PRIMARY_AND_SECONDARY:
+            PELOGW(limLog(pMac, LOGW,
+                FL("CHANNEL_SWITCH_PRIMARY_AND_SECONDARY"));)
+            limSwitchPrimarySecondaryChannel(pMac, pSessionEntry,
+                 pSessionEntry->gLimChannelSwitch.primaryChannel,
+                 pSessionEntry->gLimChannelSwitch.secondarySubBand);
+            pSessionEntry->gLimChannelSwitch.state =
+                eLIM_CHANNEL_SWITCH_IDLE;
+            break;
+
+        default:
+            PELOGE(limLog(pMac, LOGW, FL("incorrect state %d"),
+                   pSessionEntry->gLimChannelSwitch.state);)
+            if (limRestorePreChannelSwitchState(pMac,
+                pSessionEntry) != eSIR_SUCCESS)
+            {
+                limLog(pMac, LOGE,
+                    FL("Could not restore pre-channelSwitch "
+                    "(11h) state, resetting the system"));
+            }
+    }
 }
