@@ -587,9 +587,10 @@ wpt_status WDTS_RxPacket (void *pContext, wpt_packet *pFrame, WDTS_ChannelType c
         ucMPDUHOffset = usMPDUDOffset;
       }
 
-      if(VPKT_SIZE_BUFFER < (usMPDULen+ucMPDUHOffset)){
-        DTI_TRACE( DTI_TRACE_LEVEL_FATAL,
-                   "Invalid Frame size, might memory corrupted");
+      if(VPKT_SIZE_BUFFER_ALIGNED < (usMPDULen+ucMPDUHOffset)){
+        WPAL_TRACE(eWLAN_MODULE_DAL_DATA, eWLAN_PAL_TRACE_LEVEL_FATAL,
+                   "Invalid Frame size, might memory corrupted(%d+%d/%d)",
+                   usMPDULen, ucMPDUHOffset, VPKT_SIZE_BUFFER_ALIGNED);
 
         /* Size of the packet tranferred by the DMA engine is
          * greater than the the memory allocated for the skb
@@ -619,7 +620,6 @@ wpt_status WDTS_RxPacket (void *pContext, wpt_packet *pFrame, WDTS_ChannelType c
       pRxMetadata->staId = WDI_RX_BD_GET_STA_ID(pBDHeader);
       pRxMetadata->addr3Idx = WDI_RX_BD_GET_ADDR3_IDX(pBDHeader);
       pRxMetadata->rxChannel = WDI_RX_BD_GET_RX_CHANNEL(pBDHeader);
-      pRxMetadata->rfBand = WDI_RX_BD_GET_RFBAND(pBDHeader);
       pRxMetadata->rtsf = WDI_RX_BD_GET_RTSF(pBDHeader);
       pRxMetadata->bsf = WDI_RX_BD_GET_BSF(pBDHeader);
       pRxMetadata->scan = WDI_RX_BD_GET_SCAN(pBDHeader);
@@ -980,9 +980,9 @@ wpt_status WDTS_SetPowerState(void *pContext, WDTS_PowerStateType  powerState,
  * Return Value: NONE
  *
  */
-void WDTS_ChannelDebug(wpt_boolean displaySnapshot, wpt_boolean toggleStallDetect)
+void WDTS_ChannelDebug(wpt_boolean displaySnapshot, wpt_uint8 debugFlags)
 {
-   gTransportDriver.channelDebug(displaySnapshot, toggleStallDetect);
+   gTransportDriver.channelDebug(displaySnapshot, debugFlags);
    return;
 }
 

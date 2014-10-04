@@ -39,7 +39,6 @@
  * PERFORMANCE OF THIS SOFTWARE.
  */
 
-
 /*===========================================================================
 
                       s a p M o d u l e . C
@@ -54,9 +53,9 @@
 
   Are listed for each API below.
 
-  Copyright (c) 2010 Qualcomm Technologies, Inc.
+  Copyright (c) 2010 QUALCOMM Incorporated.
   All Rights Reserved.
-  Qualcomm Technologies Confidential and Proprietary
+  Qualcomm Confidential and Proprietary
 ===========================================================================*/
 
 /*===========================================================================
@@ -639,8 +638,7 @@ WLANSAP_StartBss
             //then we just follow that sessions country info (whether
             //present or not doesn't maater as we have to follow whatever
             //STA session does)
-            if ((0 == sme_GetConcurrentOperationChannel(hHal)) &&
-                pConfig->ieee80211d)
+            if (0 == sme_GetConcurrentOperationChannel(hHal))
             {
                 /* Setting the region/country  information */
                 sme_setRegInfo(hHal, pConfig->countryCode);
@@ -2178,7 +2176,7 @@ VOS_STATUS WLANSAP_RemainOnChannel( v_PVOID_t pvosGCtx,
         }
 
         halStatus = sme_RemainOnChannel( hHal, pSapCtx->sessionId,
-                          channel, duration, callback, pContext, TRUE );
+                          channel, duration, callback, pContext );
 
         if( eHAL_STATUS_SUCCESS == halStatus )
         {

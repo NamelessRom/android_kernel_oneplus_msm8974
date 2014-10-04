@@ -62,278 +62,13 @@
 
 #include "macTrace.h"
 #include "wlan_qct_wda.h"
-
-#include "wlan_hdd_assoc.h"
-#include "wlan_hdd_main.h"
-#ifdef CONFIG_CFG80211
-#include "wlan_hdd_p2p.h"
-#endif
-#include "csrNeighborRoam.h"
-#include "csrInternal.h"
-#include "limGlobal.h"
-#include "wlan_qct_tl.h"
+#include "vos_trace.h"
 
 #ifdef TRACE_RECORD
-static tTraceRecord gTraceTbl[MAX_TRACE_RECORDS];
-static tTraceData gTraceData;
-static tpTraceCb traceCBTable[VOS_MODULE_ID_MAX];
 
-/* ---------------------------------------------------------------------------
-    \fn macTraceGetHDDWlanConnState
-    \function to get string equivalent of a value
-	 from the enum eConnectionState.
 
-    \param connState - the value from the enum
-    \return the string equivalent of connState
-  ---------------------------------------------------------------------------*/
-tANI_U8* macTraceGetHDDWlanConnState(tANI_U16 connState)
-{
-    switch(connState)
-    {
-        CASE_RETURN_STRING(eConnectionState_NotConnected);
-        CASE_RETURN_STRING(eConnectionState_Connecting);
-        CASE_RETURN_STRING(eConnectionState_Associated);
-        CASE_RETURN_STRING(eConnectionState_IbssDisconnected);
-        CASE_RETURN_STRING(eConnectionState_IbssConnected);
-        CASE_RETURN_STRING(eConnectionState_Disconnecting);
 
-        default:
-            return( (tANI_U8*)"UNKNOWN" );
-            break;
-    }
-}
 
-/* ---------------------------------------------------------------------------
-    \fn macTraceGetP2PConnState
-    \function to get string equivalent of a value
-	 from the enum tP2PConnectionStatus.
-
-    \param connState - the value from the enum
-    \return the string equivalent of connState
-  ---------------------------------------------------------------------------*/
-#ifdef WLAN_FEATURE_P2P_DEBUG
-tANI_U8* macTraceGetP2PConnState(tANI_U16 connState)
-{
-    switch(connState)
-    {
-        CASE_RETURN_STRING(P2P_NOT_ACTIVE);
-        CASE_RETURN_STRING(P2P_GO_NEG_PROCESS);
-        CASE_RETURN_STRING(P2P_GO_NEG_COMPLETED);
-        CASE_RETURN_STRING(P2P_CLIENT_CONNECTING_STATE_1);
-        CASE_RETURN_STRING(P2P_GO_COMPLETED_STATE);
-        CASE_RETURN_STRING(P2P_CLIENT_CONNECTED_STATE_1);
-        CASE_RETURN_STRING(P2P_CLIENT_DISCONNECTED_STATE);
-        CASE_RETURN_STRING(P2P_CLIENT_CONNECTING_STATE_2);
-        CASE_RETURN_STRING(P2P_CLIENT_COMPLETED_STATE);
-
-        default:
-            return( (tANI_U8*)"UNKNOWN" );
-            break;
-    }
-}
-#endif
-
-/* ---------------------------------------------------------------------------
-    \fn macTraceGetNeighbourRoamState
-    \function to get string equivalent of a value
-	 from the enum eCsrNeighborRoamState.
-
-    \param neighbourRoamState - the value from the enum
-    \return the string equivalent of neighbourRoamState
-  ---------------------------------------------------------------------------*/
-tANI_U8* macTraceGetNeighbourRoamState(tANI_U16 neighbourRoamState)
-{
-    switch(neighbourRoamState)
-    {
-        CASE_RETURN_STRING(eCSR_NEIGHBOR_ROAM_STATE_CLOSED);
-        CASE_RETURN_STRING(eCSR_NEIGHBOR_ROAM_STATE_INIT);
-        CASE_RETURN_STRING(eCSR_NEIGHBOR_ROAM_STATE_CONNECTED);
-        CASE_RETURN_STRING(eCSR_NEIGHBOR_ROAM_STATE_CFG_CHAN_LIST_SCAN);
-        CASE_RETURN_STRING(eCSR_NEIGHBOR_ROAM_STATE_REASSOCIATING);
-        #ifdef WLAN_FEATURE_VOWIFI_11R
-        CASE_RETURN_STRING(eCSR_NEIGHBOR_ROAM_STATE_REPORT_QUERY);
-        CASE_RETURN_STRING(eCSR_NEIGHBOR_ROAM_STATE_REPORT_SCAN);
-        CASE_RETURN_STRING(eCSR_NEIGHBOR_ROAM_STATE_PREAUTHENTICATING);
-        CASE_RETURN_STRING(eCSR_NEIGHBOR_ROAM_STATE_PREAUTH_DONE);
-        #endif /* WLAN_FEATURE_VOWIFI_11R */
-        CASE_RETURN_STRING(eNEIGHBOR_STATE_MAX);
-
-        default:
-            return( (tANI_U8*)"UNKNOWN" );
-            break;
-    }
-}
-
-/* ---------------------------------------------------------------------------
-    \fn macTraceGetcsrRoamState
-    \function to get string equivalent of a value
-	 from the enum eCsrRoamState.
-
-    \param csrRoamState - the value from the enum
-    \return the string equivalent of csrRoamState
-  ---------------------------------------------------------------------------*/
-tANI_U8* macTraceGetcsrRoamState(tANI_U16 csrRoamState)
-{
-    switch(csrRoamState)
-    {
-        CASE_RETURN_STRING(eCSR_ROAMING_STATE_STOP);
-        CASE_RETURN_STRING(eCSR_ROAMING_STATE_IDLE);
-        CASE_RETURN_STRING(eCSR_ROAMING_STATE_SCANNING);
-        CASE_RETURN_STRING(eCSR_ROAMING_STATE_JOINING);
-        CASE_RETURN_STRING(eCSR_ROAMING_STATE_JOINED);
-
-        default:
-            return( (tANI_U8*)"UNKNOWN" );
-            break;
-    }
-}
-
-/* ---------------------------------------------------------------------------
-    \fn macTraceGetcsrRoamSubState
-    \function to get string equivalent of a value
-	 from the enum eCsrRoamSubState.
-
-    \param csrRoamSubState - the value from the enum
-    \return the string equivalent of csrRoamSubState
-  ---------------------------------------------------------------------------*/
-tANI_U8* macTraceGetcsrRoamSubState(tANI_U16 csrRoamSubState)
-{
-    switch(csrRoamSubState)
-    {
-        CASE_RETURN_STRING(eCSR_ROAM_SUBSTATE_NONE);
-        CASE_RETURN_STRING(eCSR_ROAM_SUBSTATE_START_BSS_REQ);
-        CASE_RETURN_STRING(eCSR_ROAM_SUBSTATE_JOIN_REQ);
-        CASE_RETURN_STRING(eCSR_ROAM_SUBSTATE_REASSOC_REQ);
-        CASE_RETURN_STRING(eCSR_ROAM_SUBSTATE_DISASSOC_REQ);
-        CASE_RETURN_STRING(eCSR_ROAM_SUBSTATE_STOP_BSS_REQ);
-        CASE_RETURN_STRING(eCSR_ROAM_SUBSTATE_DISCONNECT_CONTINUE_ROAMING);
-        CASE_RETURN_STRING(eCSR_ROAM_SUBSTATE_AUTH_REQ);
-        CASE_RETURN_STRING(eCSR_ROAM_SUBSTATE_CONFIG);
-        CASE_RETURN_STRING(eCSR_ROAM_SUBSTATE_DEAUTH_REQ);
-        CASE_RETURN_STRING(eCSR_ROAM_SUBSTATE_DISASSOC_NOTHING_TO_JOIN);
-        CASE_RETURN_STRING(eCSR_ROAM_SUBSTATE_DISASSOC_REASSOC_FAILURE);
-        CASE_RETURN_STRING(eCSR_ROAM_SUBSTATE_DISASSOC_FORCED);
-        CASE_RETURN_STRING(eCSR_ROAM_SUBSTATE_WAIT_FOR_KEY);
-        CASE_RETURN_STRING(eCSR_ROAM_SUBSTATE_DISASSOC_HANDOFF);
-        CASE_RETURN_STRING(eCSR_ROAM_SUBSTATE_JOINED_NO_TRAFFIC);
-        CASE_RETURN_STRING(eCSR_ROAM_SUBSTATE_JOINED_NON_REALTIME_TRAFFIC);
-        CASE_RETURN_STRING(eCSR_ROAM_SUBSTATE_JOINED_REALTIME_TRAFFIC);
-
-        default:
-            return( (tANI_U8*)"UNKNOWN" );
-            break;
-    }
-}
-
-/* ---------------------------------------------------------------------------
-    \fn macTraceGetLimSmeState
-    \function to get string equivalent of a value
-	 from the enum tLimSmeStates.
-
-    \param limState - the value from the enum
-    \return the string equivalent of limState
-  ---------------------------------------------------------------------------*/
-tANI_U8* macTraceGetLimSmeState(tANI_U16 limState)
-{
-    switch(limState)
-    {
-        CASE_RETURN_STRING(eLIM_SME_OFFLINE_STATE);
-        CASE_RETURN_STRING(eLIM_SME_IDLE_STATE);
-        CASE_RETURN_STRING(eLIM_SME_SUSPEND_STATE);
-        CASE_RETURN_STRING(eLIM_SME_WT_SCAN_STATE);
-        CASE_RETURN_STRING(eLIM_SME_WT_JOIN_STATE);
-        CASE_RETURN_STRING(eLIM_SME_WT_AUTH_STATE);
-        CASE_RETURN_STRING(eLIM_SME_WT_ASSOC_STATE);
-        CASE_RETURN_STRING(eLIM_SME_WT_REASSOC_STATE);
-        CASE_RETURN_STRING(eLIM_SME_WT_REASSOC_LINK_FAIL_STATE);
-        CASE_RETURN_STRING(eLIM_SME_JOIN_FAILURE_STATE);
-        CASE_RETURN_STRING(eLIM_SME_ASSOCIATED_STATE);
-        CASE_RETURN_STRING(eLIM_SME_REASSOCIATED_STATE);
-        CASE_RETURN_STRING(eLIM_SME_LINK_EST_STATE);
-        CASE_RETURN_STRING(eLIM_SME_LINK_EST_WT_SCAN_STATE);
-        CASE_RETURN_STRING(eLIM_SME_WT_PRE_AUTH_STATE);
-        CASE_RETURN_STRING(eLIM_SME_WT_DISASSOC_STATE);
-        CASE_RETURN_STRING(eLIM_SME_WT_DEAUTH_STATE);
-        CASE_RETURN_STRING(eLIM_SME_WT_START_BSS_STATE);
-        CASE_RETURN_STRING(eLIM_SME_WT_STOP_BSS_STATE);
-        CASE_RETURN_STRING(eLIM_SME_NORMAL_STATE);
-        CASE_RETURN_STRING(eLIM_SME_CHANNEL_SCAN_STATE);
-        CASE_RETURN_STRING(eLIM_SME_NORMAL_CHANNEL_SCAN_STATE);
-
-        default:
-            return( (tANI_U8*)"UNKNOWN" );
-            break;
-    }
-}
-
-/* ---------------------------------------------------------------------------
-    \fn macTraceGetLimMlmState
-    \function to get string equivalent of a value
-	 from the enum tLimMlmStates.
-
-    \param mlmState - the value from the enum
-    \return the string equivalent of mlmState
-  ---------------------------------------------------------------------------*/
-tANI_U8* macTraceGetLimMlmState(tANI_U16 mlmState)
-{
-    switch(mlmState)
-    {
-        CASE_RETURN_STRING(eLIM_MLM_OFFLINE_STATE);
-        CASE_RETURN_STRING(eLIM_MLM_IDLE_STATE);
-        CASE_RETURN_STRING(eLIM_MLM_WT_PROBE_RESP_STATE);
-        CASE_RETURN_STRING(eLIM_MLM_PASSIVE_SCAN_STATE);
-        CASE_RETURN_STRING(eLIM_MLM_WT_JOIN_BEACON_STATE);
-        CASE_RETURN_STRING(eLIM_MLM_JOINED_STATE);
-        CASE_RETURN_STRING(eLIM_MLM_BSS_STARTED_STATE);
-        CASE_RETURN_STRING(eLIM_MLM_WT_AUTH_FRAME2_STATE);
-        CASE_RETURN_STRING(eLIM_MLM_WT_AUTH_FRAME3_STATE);
-        CASE_RETURN_STRING(eLIM_MLM_WT_AUTH_FRAME4_STATE);
-        CASE_RETURN_STRING(eLIM_MLM_AUTH_RSP_TIMEOUT_STATE);
-        CASE_RETURN_STRING(eLIM_MLM_AUTHENTICATED_STATE);
-        CASE_RETURN_STRING(eLIM_MLM_WT_ASSOC_RSP_STATE);
-        CASE_RETURN_STRING(eLIM_MLM_WT_REASSOC_RSP_STATE);
-        CASE_RETURN_STRING(eLIM_MLM_ASSOCIATED_STATE);
-        CASE_RETURN_STRING(eLIM_MLM_REASSOCIATED_STATE);
-        CASE_RETURN_STRING(eLIM_MLM_LINK_ESTABLISHED_STATE);
-        CASE_RETURN_STRING(eLIM_MLM_WT_ASSOC_CNF_STATE);
-        CASE_RETURN_STRING(eLIM_MLM_LEARN_STATE);
-        CASE_RETURN_STRING(eLIM_MLM_WT_ADD_BSS_RSP_STATE);
-        CASE_RETURN_STRING(eLIM_MLM_WT_DEL_BSS_RSP_STATE);
-        CASE_RETURN_STRING(eLIM_MLM_WT_ADD_BSS_RSP_ASSOC_STATE);
-        CASE_RETURN_STRING(eLIM_MLM_WT_ADD_BSS_RSP_REASSOC_STATE);
-        CASE_RETURN_STRING(eLIM_MLM_WT_ADD_BSS_RSP_PREASSOC_STATE);
-        CASE_RETURN_STRING(eLIM_MLM_WT_ADD_STA_RSP_STATE);
-        CASE_RETURN_STRING(eLIM_MLM_WT_DEL_STA_RSP_STATE);
-
-        default:
-            return( (tANI_U8*)"UNKNOWN" );
-            break;
-    }
-}
-
-/* ---------------------------------------------------------------------------
-    \fn macTraceGetTLState
-    \function to get string equivalent of a value
-	 from the enum WLANTL_STAStateType.
-
-    \param tlState - the value from the enum
-    \return the string equivalent of tlState
-  ---------------------------------------------------------------------------*/
-tANI_U8* macTraceGetTLState(tANI_U16 tlState)
-{
-   switch(tlState)
-    {
-        CASE_RETURN_STRING(WLANTL_STA_INIT);
-        CASE_RETURN_STRING(WLANTL_STA_CONNECTED);
-        CASE_RETURN_STRING(WLANTL_STA_AUTHENTICATED);
-        CASE_RETURN_STRING(WLANTL_STA_DISCONNECTED);
-        CASE_RETURN_STRING(WLANTL_STA_MAX_STATE);
-
-        default:
-            return( (tANI_U8*)"UNKNOWN" );
-            break;
-   }
-}
 
 tANI_U8* macTraceGetSmeMsgString( tANI_U16 smeMsg )
 {
@@ -462,7 +197,6 @@ tANI_U8* macTraceGetSmeMsgString( tANI_U16 smeMsg )
         CASE_RETURN_STRING(eWNI_SME_UPDATE_NOA);
         CASE_RETURN_STRING(eWNI_SME_CLEAR_DFS_CHANNEL_LIST);
         CASE_RETURN_STRING(eWNI_SME_PRE_CHANNEL_SWITCH_FULL_POWER);
-        CASE_RETURN_STRING(eWNI_SME_GET_SNR_REQ);
         CASE_RETURN_STRING(eWNI_PMC_MSG_TYPES_BEGIN);
 
         //General Power Save Messages
@@ -526,7 +260,6 @@ tANI_U8* macTraceGetSmeMsgString( tANI_U16 smeMsg )
 #endif // FEATURE_WLAN_SCAN_PNO
         CASE_RETURN_STRING(eWNI_SME_TX_PER_HIT_IND);
         CASE_RETURN_STRING(eWNI_SME_CHANGE_COUNTRY_CODE);
-        CASE_RETURN_STRING(eWNI_SME_GENERIC_CHANGE_COUNTRY_CODE);
         CASE_RETURN_STRING(eWNI_SME_PRE_SWITCH_CHL_IND);
         CASE_RETURN_STRING(eWNI_SME_POST_SWITCH_CHL_IND);
         CASE_RETURN_STRING(eWNI_SME_MAX_ASSOC_EXCEEDED);
@@ -542,9 +275,6 @@ tANI_U8* macTraceGetSmeMsgString( tANI_U16 smeMsg )
         CASE_RETURN_STRING(eWNI_SME_MSG_TYPES_END);
         CASE_RETURN_STRING(eWNI_SME_GET_ROAM_RSSI_REQ);
         CASE_RETURN_STRING(eWNI_SME_GET_ROAM_RSSI_RSP);
-        CASE_RETURN_STRING(eWNI_SME_GET_TSM_STATS_REQ);
-        CASE_RETURN_STRING(eWNI_SME_GET_TSM_STATS_RSP);
-
         default:
             return( (tANI_U8*)"UNKNOWN" );
             break;
@@ -793,17 +523,11 @@ tANI_U8* macTraceGetWdaMsgString( tANI_U16 wdaMsg )
 #ifdef WLAN_FEATURE_11AC
         CASE_RETURN_STRING(WDA_UPDATE_OP_MODE);
 #endif
-#ifdef FEATURE_WLAN_BATCH_SCAN
-        CASE_RETURN_STRING(WDA_SET_BATCH_SCAN_REQ);
-        CASE_RETURN_STRING(WDA_TRIGGER_BATCH_SCAN_RESULT_IND);
-#endif
         default:
             return((tANI_U8*) "UNKNOWN" );
             break;
     }
 }
-
-
 
 tANI_U8* macTraceGetLimMsgString( tANI_U16 limMsg )
 {
@@ -869,9 +593,6 @@ tANI_U8* macTraceGetLimMsgString( tANI_U16 limMsg )
     }
 }
 
-
-
-
 tANI_U8* macTraceGetCfgMsgString( tANI_U16 cfgMsg )
 {
     switch( cfgMsg )
@@ -909,152 +630,20 @@ tANI_U8* macTraceGetModuleString( tANI_U8 moduleId  )
     //return gVosTraceInfo[moduleId].moduleNameStr;
 }
 
-
-
-
-
-
-
-
-
-
-void macTraceInit(tpAniSirGlobal pMac)
-{
-    tANI_U8 i;
-    gTraceData.head = INVALID_TRACE_ADDR;
-    gTraceData.tail = INVALID_TRACE_ADDR;
-    gTraceData.num = 0;
-    gTraceData.enable = TRUE;
-    gTraceData.dumpCount = DEFAULT_TRACE_DUMP_COUNT;
-    gTraceData.numSinceLastDump = 0;
-
-    for(i=0; i<VOS_MODULE_ID_MAX; i++)
-        traceCBTable[i] = NULL;
-
-}
-
-
-
-
-
 void macTraceReset(tpAniSirGlobal pMac)
 {
 }
-
 
 void macTrace(tpAniSirGlobal pMac,  tANI_U8 code, tANI_U8 session, tANI_U32 data)
 {
     //Today macTrace is being invoked by PE only, need to remove this function once PE is migrated to using new trace API.
     macTraceNew(pMac, VOS_MODULE_ID_PE, code, session, data);
-
-#if 0
-    tpTraceRecord rec = NULL;
-
-    //limLog(pMac, LOGE, "mac Trace code: %d, data: %x, head: %d, tail: %d\n",  code, data, gTraceData.head, gTraceData.tail);
-
-    if(!gTraceData.enable)
-        return;
-    gTraceData.num++;
-
-    if (gTraceData.head == INVALID_TRACE_ADDR)
-    {
-        /* first record */
-        gTraceData.head = 0;
-        gTraceData.tail = 0;
-    }
-    else
-    {
-        /* queue is not empty */
-        tANI_U32 tail = gTraceData.tail + 1;
-
-        if (tail == MAX_TRACE_RECORDS)
-            tail = 0;
-
-        if (gTraceData.head == tail)
-        {
-            /* full */
-            if (++gTraceData.head == MAX_TRACE_RECORDS)
-                gTraceData.head = 0;
-        }
-
-        gTraceData.tail = tail;
-    }
-
-    rec = &gTraceTbl[gTraceData.tail];
-    rec->code = code;
-    rec->session = session;
-    rec->data = data;
-    rec->time = vos_timer_get_system_time();
-    rec->module =  VOS_MODULE_ID_PE;
-    gTraceData.numSinceLastDump ++;
-
-    if(gTraceData.numSinceLastDump == gTraceData.dumpCount)
-        {
-            limLog(pMac, LOGE, "Trace Dump last %d traces\n",  gTraceData.dumpCount);
-            macTraceDumpAll(pMac, 0, 0, gTraceData.dumpCount);
-            gTraceData.numSinceLastDump = 0;
-        }
-    #endif
-
 }
-
-
 
 void macTraceNew(tpAniSirGlobal pMac, tANI_U8 module, tANI_U8 code, tANI_U8 session, tANI_U32 data)
 {
-    tpTraceRecord rec = NULL;
-
-    //limLog(pMac, LOGE, "mac Trace code: %d, data: %x, head: %d, tail: %d\n",  code, data, gTraceData.head, gTraceData.tail);
-
-    if(!gTraceData.enable)
-        return;
-    //If module is not registered, don't record for that module.
-    if(traceCBTable[module] == NULL)
-        return;
-    pe_AcquireGlobalLock( &pMac->lim );
-
-    gTraceData.num++;
-
-    if (gTraceData.head == INVALID_TRACE_ADDR)
-    {
-        /* first record */
-        gTraceData.head = 0;
-        gTraceData.tail = 0;
-    }
-    else
-    {
-        /* queue is not empty */
-        tANI_U32 tail = gTraceData.tail + 1;
-
-        if (tail == MAX_TRACE_RECORDS)
-            tail = 0;
-
-        if (gTraceData.head == tail)
-        {
-            /* full */
-            if (++gTraceData.head == MAX_TRACE_RECORDS)
-                gTraceData.head = 0;
-        }
-
-        gTraceData.tail = tail;
-    }
-
-    rec = &gTraceTbl[gTraceData.tail];
-    rec->code = code;
-    rec->session = session;
-    rec->data = data;
-    rec->time = vos_timer_get_system_time();
-    rec->module =  module;
-    gTraceData.numSinceLastDump ++;
-    pe_ReleaseGlobalLock( &pMac->lim );
-
+    vos_trace(module, code, session, data);
 }
-
-
-
-
-
-
 
 tANI_U8* macTraceMsgString(tpAniSirGlobal pMac, tANI_U32 msgType)
 {
@@ -1077,89 +666,5 @@ tANI_U8* macTraceMsgString(tpAniSirGlobal pMac, tANI_U32 msgType)
                 return ((tANI_U8*)"Unknown MsgType");
     }
 }
-
-
-
-
-
-
-void macTraceDumpAll(tpAniSirGlobal pMac, tANI_U8 code, tANI_U8 session, tANI_U32 count)
-{
-    tpTraceRecord pRecord;
-    tANI_S32 i, tail;
-
-
-    if(!gTraceData.enable)
-    {
-        VOS_TRACE( VOS_MODULE_ID_SYS, VOS_TRACE_LEVEL_ERROR, "Tracing Disabled \n");
-        return;
-    }
-
-    VOS_TRACE( VOS_MODULE_ID_SYS, VOS_TRACE_LEVEL_ERROR,
-                            "Total Records: %d, Head: %d, Tail: %d\n", gTraceData.num, gTraceData.head, gTraceData.tail);
-
-    pe_AcquireGlobalLock( &pMac->lim );
-    if (gTraceData.head != INVALID_TRACE_ADDR)
-    {
-
-        i = gTraceData.head;
-        tail = gTraceData.tail;
-
-        if (count)
-        {
-            if (count > gTraceData.num)
-                count = gTraceData.num;
-            if (count > MAX_TRACE_RECORDS)
-                count = MAX_TRACE_RECORDS;
-            if(tail >= (count + 1))
-            {
-                i = tail - count + 1;
-            }
-            else
-            {
-                i = MAX_TRACE_RECORDS - ((count + 1) - tail);
-            }
-        }
-
-        pRecord = &gTraceTbl[i];
-
-        for (;;)
-        {
-            if (   (code == 0 || (code == pRecord->code)) &&
-                    (traceCBTable[pRecord->module] != NULL))
-                traceCBTable[pRecord->module](pMac, pRecord, (tANI_U16)i);
-
-            if (i == tail)
-                break;
-            i += 1;
-
-            if (i == MAX_TRACE_RECORDS)
-            {
-                i = 0;
-                pRecord = &gTraceTbl[0];
-            }
-            else
-                pRecord += 1;
-        }
-        gTraceData.numSinceLastDump = 0;
-
-    }
-    pe_ReleaseGlobalLock( &pMac->lim );
-
-}
-
-
-void macTraceCfg(tpAniSirGlobal pMac, tANI_U32 enable, tANI_U32 dumpCount, tANI_U32 code, tANI_U32 session)
-{
-    gTraceData.enable = (tANI_U8)enable;
-    gTraceData.dumpCount= (tANI_U16)dumpCount;
-    gTraceData.numSinceLastDump = 0;
-}
-
-void macTraceRegister( tpAniSirGlobal pMac, VOS_MODULE_ID moduleId,    tpTraceCb traceCb)
-{
-    traceCBTable[moduleId] = traceCb;
-}
-
 
 #endif

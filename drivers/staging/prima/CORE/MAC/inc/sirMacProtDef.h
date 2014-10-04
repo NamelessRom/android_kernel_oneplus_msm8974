@@ -262,9 +262,7 @@
 
 #ifdef WLAN_FEATURE_11W
 //11w SA query request/response action frame category code
-#define SIR_MAC_ACTION_SA_QUERY          8
-#define SIR_MAC_SA_QUERY_REQ             0
-#define SIR_MAC_SA_QUERY_RSP             1
+#define SIR_MAC_ACTION_SA_QUERY               8 
 #endif
 
 #ifdef FEATURE_WLAN_TDLS
@@ -394,11 +392,7 @@
 #define SIR_MAC_EXTENDED_RATE_EID      50
 #define SIR_MAC_EXTENDED_RATE_EID_MIN      0
 #define SIR_MAC_EXTENDED_RATE_EID_MAX      255
-// reserved       51-69
-#define SIR_MAC_RM_ENABLED_CAPABILITY_EID      70
-#define SIR_MAC_RM_ENABLED_CAPABILITY_EID_MIN  5
-#define SIR_MAC_RM_ENABLED_CAPABILITY_EID_MAX  5
-// reserved       71-220
+// reserved       51-220
 #define SIR_MAC_WPA_EID                221
 #define SIR_MAC_WPA_EID_MIN                0
 #define SIR_MAC_WPA_EID_MAX                255
@@ -460,6 +454,9 @@
 #define SIR_MAX_NOA_ATTR_LEN        31
 #define SIR_MAX_NOA_DESCR           2
 #define SIR_P2P_IE_HEADER_LEN       6
+
+#define SIR_MAC_CISCO_OUI "\x00\x40\x96"
+#define SIR_MAC_CISCO_OUI_SIZE 3
 
 // min size of wme oui header: oui(3) + type + subtype + version
 #define SIR_MAC_OUI_WME_HDR_MIN       6
@@ -765,10 +762,7 @@ typedef enum eSirMacReasonCodes
     eSIR_MAC_TDLS_TEARDOWN_PEER_UNREACHABLE          = 25, //TDLS direct link teardown due to TDLS peer STA unreachable via the TDLS direct link
     eSIR_MAC_TDLS_TEARDOWN_UNSPEC_REASON             = 26, //TDLS direct link teardown for unspecified reason
 #endif
-    // reserved                                        27 - 30
-#ifdef WLAN_FEATURE_11W
-    eSIR_MAC_ROBUST_MGMT_FRAMES_POLICY_VIOLATION     = 31, //Robust management frames policy violation
-#endif
+    // reserved                                        27 - 31
     eSIR_MAC_QOS_UNSPECIFIED_REASON                  = 32, //Disassociated for unspecified, QoS-related reason
     eSIR_MAC_QAP_NO_BANDWIDTH_REASON                 = 33, //Disassociated because QoS AP lacks sufficient bandwidth for this QoS STA
     eSIR_MAC_XS_UNACKED_FRAMES_REASON                = 34, //Disassociated because excessive number of frames need to be acknowledged, but are not
@@ -1087,86 +1081,6 @@ typedef __ani_attr_pre_packed struct sSirMacWpaInfo
     tANI_U8        length;
     tANI_U8        info[SIR_MAC_MAX_IE_LENGTH];
 } __ani_attr_packed tSirMacWpaInfo, *tpSirMacWpaInfo, tSirMacRsnInfo, *tpSirMacRsnInfo;
-
-typedef __ani_attr_pre_packed struct sSirMacFHParamSet
-{
-    tANI_U16     dwellTime;
-    tANI_U8      hopSet;
-    tANI_U8      hopPattern;
-    tANI_U8      hopIndex;
-} tSirMacFHParamSet, *tpSirMacFHParamSet;
-
-typedef __ani_attr_pre_packed struct sSirMacIBSSParams
-{
-    tANI_U16     atim;
-} tSirMacIBSSParams, *tpSirMacIBSSParams;
-
-typedef __ani_attr_pre_packed struct sSirMacRRMEnabledCap
-{
-#ifndef ANI_LITTLE_BIT_ENDIAN
-    tANI_U8                reserved: 6;
-    tANI_U8      AntennaInformation: 1;
-    tANI_U8       BSSAvailAdmission: 1;
-    tANI_U8       BssAvgAccessDelay: 1;
-    tANI_U8         RSNIMeasurement: 1;
-    tANI_U8         RCPIMeasurement: 1;
-    tANI_U8       NeighborTSFOffset: 1;
-    tANI_U8 MeasurementPilotEnabled: 1;
-    tANI_U8        MeasurementPilot: 3;
-    tANI_U8      nonOperatinChanMax: 3;
-    tANI_U8        operatingChanMax: 3;
-    tANI_U8           RRMMIBEnabled: 1;
-    tANI_U8            APChanReport: 1;
-    tANI_U8            triggeredTCM: 1;
-    tANI_U8           TCMCapability: 1;
-    tANI_U8              LCIAzimuth: 1;
-    tANI_U8          LCIMeasurement: 1;
-    tANI_U8              statistics: 1;
-    tANI_U8          NoiseHistogram: 1;
-    tANI_U8             ChannelLoad: 1;
-    tANI_U8        FrameMeasurement: 1;
-    tANI_U8           BeaconRepCond: 1;
-    tANI_U8             BeaconTable: 1;
-    tANI_U8            BeaconActive: 1;
-    tANI_U8           BeaconPassive: 1;
-    tANI_U8                repeated: 1;
-    tANI_U8                parallel: 1;
-    tANI_U8             NeighborRpt: 1;
-    tANI_U8         LinkMeasurement: 1;
-    tANI_U8                    present;
-#else
-    tANI_U8                    present;
-    tANI_U8         LinkMeasurement: 1;
-    tANI_U8             NeighborRpt: 1;
-    tANI_U8                parallel: 1;
-    tANI_U8                repeated: 1;
-    tANI_U8           BeaconPassive: 1;
-    tANI_U8            BeaconActive: 1;
-    tANI_U8             BeaconTable: 1;
-    tANI_U8           BeaconRepCond: 1;
-    tANI_U8        FrameMeasurement: 1;
-    tANI_U8             ChannelLoad: 1;
-    tANI_U8          NoiseHistogram: 1;
-    tANI_U8              statistics: 1;
-    tANI_U8          LCIMeasurement: 1;
-    tANI_U8              LCIAzimuth: 1;
-    tANI_U8           TCMCapability: 1;
-    tANI_U8            triggeredTCM: 1;
-    tANI_U8            APChanReport: 1;
-    tANI_U8           RRMMIBEnabled: 1;
-    tANI_U8        operatingChanMax: 3;
-    tANI_U8      nonOperatinChanMax: 3;
-    tANI_U8        MeasurementPilot: 3;
-    tANI_U8 MeasurementPilotEnabled: 1;
-    tANI_U8       NeighborTSFOffset: 1;
-    tANI_U8         RCPIMeasurement: 1;
-    tANI_U8         RSNIMeasurement: 1;
-    tANI_U8       BssAvgAccessDelay: 1;
-    tANI_U8       BSSAvailAdmission: 1;
-    tANI_U8      AntennaInformation: 1;
-    tANI_U8                reserved: 6;
-#endif
-} tSirMacRRMEnabledCap, *tpSirMacRRMEnabledCap;
 
 
 /* ----------------

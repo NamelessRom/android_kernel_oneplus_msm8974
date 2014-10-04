@@ -77,17 +77,8 @@
 #define P2P_ACTION_FRAME "\x7f\x50\x6f\x9a\x09"
 #define P2P_ACTION_FRAME_SIZE 5
 
-#define SA_QUERY_FRAME_REQ "\x08\x00"
-#define SA_QUERY_FRAME_REQ_SIZE 2
-
-#define SA_QUERY_FRAME_RSP "\x08\x01"
-#define SA_QUERY_FRAME_RSP_SIZE 2
-
 #define HDD_P2P_WILDCARD_SSID "DIRECT-" //TODO Put it in proper place;
 #define HDD_P2P_WILDCARD_SSID_LEN 7
-
-#define WNM_BSS_ACTION_FRAME "\x0a\x07"
-#define WNM_BSS_ACTION_FRAME_SIZE 2
 
 #define WPA_OUI_TYPE   "\x00\x50\xf2\x01"
 #define BLACKLIST_OUI_TYPE   "\x00\x50\x00\x00"
@@ -133,6 +124,17 @@ int wlan_hdd_cfg80211_pmksa_candidate_notify(
                     int index, bool preauth );
 #endif
 
+#ifdef FEATURE_WLAN_LFR_METRICS
+VOS_STATUS wlan_hdd_cfg80211_roam_metrics_preauth(hdd_adapter_t *pAdapter,
+                                                  tCsrRoamInfo *pRoamInfo);
+
+VOS_STATUS wlan_hdd_cfg80211_roam_metrics_preauth_status(
+    hdd_adapter_t *pAdapter, tCsrRoamInfo *pRoamInfo, bool preauth_status);
+
+VOS_STATUS wlan_hdd_cfg80211_roam_metrics_handover(hdd_adapter_t *pAdapter,
+                                                   tCsrRoamInfo *pRoamInfo);
+#endif
+
 #ifdef FEATURE_WLAN_WAPI
 void wlan_hdd_cfg80211_set_key_wapi(hdd_adapter_t* pAdapter,
               u8 key_index, const u8 *mac_addr, u8 *key , int key_Len);
@@ -155,20 +157,8 @@ void wlan_hdd_cfg80211_post_voss_start(hdd_adapter_t* pAdapter);
 
 void wlan_hdd_cfg80211_pre_voss_stop(hdd_adapter_t* pAdapter);
 
-#ifdef CONFIG_ENABLE_LINUX_REG
-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(3,9,0))
-void wlan_hdd_linux_reg_notifier(struct wiphy *wiphy, struct regulatory_request *request);
-#else
-int wlan_hdd_linux_reg_notifier(struct wiphy *wiphy, struct regulatory_request *request);
-#endif
-#else
-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(3,9,0))
-void wlan_hdd_crda_reg_notifier(struct wiphy *wiphy, struct regulatory_request *request);
-#else
 int wlan_hdd_crda_reg_notifier(struct wiphy *wiphy, struct regulatory_request *request);
-#endif
-#endif
-
+int wlan_hdd_get_crda_regd_entry(struct wiphy *wiphy, hdd_config_t *pCfg);
 extern v_VOID_t hdd_connSetConnectionState( hdd_station_ctx_t *pHddStaCtx,
                                         eConnectionState connState );
 VOS_STATUS wlan_hdd_validate_operation_channel(hdd_adapter_t *pAdapter,int channel);
@@ -181,7 +171,5 @@ extern void wlan_hdd_cfg80211_update_replayCounterCallback(void *callbackContext
                             tpSirGtkOffloadGetInfoRspParams pGtkOffloadGetInfoRsp);
 #endif
 void* wlan_hdd_change_country_code_cb(void *pAdapter);
-void hdd_select_cbmode( hdd_adapter_t *pAdapter,v_U8_t operationChannel);
-
 
 #endif

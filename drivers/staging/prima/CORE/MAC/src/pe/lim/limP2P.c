@@ -83,7 +83,11 @@
    received Beacon/Prpbe Resp. */
 #define   MAX_TIME_TO_BE_ACTIVE_CHANNEL 9000
 
-
+#define REMAIN_ON_CHANNEL_UNKNOWN_ACTION_CATEGORY    0x20
+#define VENDOR_SPECIFIC_ELEMENT_ID                   221
+#define REMAIN_ON_CHANNEL_MSG_SIZE                   55
+#define REMAIN_ON_CHANNEL_FIRST_MARKER_FRAME         1
+#define REMAIN_ON_CHANNEL_SECOND_MARKER_FRAME        2
 
 void limRemainOnChnlSuspendLinkHdlr(tpAniSirGlobal pMac, eHalStatus status,
                                        tANI_U32 *data);
@@ -99,6 +103,179 @@ extern tSirRetStatus limSetLinkState(
 
 static tSirRetStatus limCreateSessionForRemainOnChn(tpAniSirGlobal pMac, tPESession **ppP2pSession);
 eHalStatus limP2PActionCnf(tpAniSirGlobal pMac, tANI_U32 txCompleteSuccess);
+
+/*----------------------------------------------------------------------------
+ *
+ * The function limSendRemainOnChannelDebugMarkerFrame, prepares Marker frame
+ * for Start and End of remain on channel with RemainOnChannelMsg as Vendor
+ * Specific information element of the frame.
+ *
+ *----------------------------------------------------------------------------*/
+tSirRetStatus limSendRemainOnChannelDebugMarkerFrame(tpAniSirGlobal pMac,
+                                                     tANI_U8 *remainOnChannelMsg)
+{
+    tSirMacAddr          magicMacAddr= {0x11, 0x22, 0x33, 0x44, 0x55, 0x66};
+    tANI_U32             nBytes, nPayload;
+    tSirRetStatus        nSirStatus;
+    tANI_U8              *pFrame;
+    void                 *pPacket;
+    eHalStatus           halstatus;
+    tANI_U8              txFlag = 0;
+    publicVendorSpecific *pPublicVendorSpecific;
+
+    pPublicVendorSpecific = vos_mem_malloc(sizeof(publicVendorSpecific));
+    if( pPublicVendorSpecific == NULL )
+    {
+        limLog( pMac, LOGE,
+                FL( "Unable to allocate memory for Vendor specific information"
+                    " element" ) );
+        return eSIR_MEM_ALLOC_FAILED;
+    }
+    // Assigning Action category code as unknown as this is debug marker frame
+    pPublicVendorSpecific->category = REMAIN_ON_CHANNEL_UNKNOWN_ACTION_CATEGORY;
+    pPublicVendorSpecific->elementid = VENDOR_SPECIFIC_ELEMENT_ID;
+    pPublicVendorSpecific->length = strlen(remainOnChannelMsg);
+
+    nPayload = sizeof(publicVendorSpecific) + pPublicVendorSpecific->length;
+
+    nBytes = nPayload + sizeof( tSirMacMgmtHdr );
+
+    halstatus = palPktAlloc( pMac->hHdd, HAL_TXRX_FRM_802_11_MGMT,
+                             ( tANI_U16 )nBytes, ( void** ) &pFrame,
+                             ( void** ) &pPacket );
+    if ( ! HAL_STATUS_SUCCESS ( halstatus ) )
+    {
+        limLog( pMac, LOGE, FL("Failed to allocate %d bytes for a Remain"
+                               " on channel action frame."), nBytes );
+        nSirStatus = eSIR_MEM_ALLOC_FAILED;
+        goto end;
+    }
+    vos_mem_zero( pFrame, nBytes );
+
+    // Populate frame with MAC header
+    nSirStatus = limPopulateMacHeader( pMac, pFrame, SIR_MAC_MGMT_FRAME,
+                                SIR_MAC_MGMT_ACTION, magicMacAddr,
+                                pMac->lim.gSelfMacAddr);
+    if ( eSIR_SUCCESS != nSirStatus )
+    {
+        limLog( pMac, LOGE, FL("Failed to populate the buffer descriptor for a"
+                               " Action frame for remain on channel.") );
+        palPktFree( pMac->hHdd, HAL_TXRX_FRM_802_11_MGMT,
+                    ( void* ) pFrame, ( void* ) pPacket );
+        goto end;
+    }
+
+    // Copy Public Vendor specific fields to frame's information element
+    vos_mem_copy( (pFrame + (sizeof( tSirMacMgmtHdr ))),
+                   pPublicVendorSpecific, sizeof(publicVendorSpecific) );
+    // Copy Remain On channel message to Vendor Specific information field
+    vos_mem_copy( (pFrame + (nBytes - pPublicVendorSpecific->length)),
+                   remainOnChannelMsg, pPublicVendorSpecific->length );
+
+    halstatus = halTxFrame( pMac, pPacket,
+                            ( tANI_U16 ) sizeof(tSirMacMgmtHdr) + nPayload,
+                            HAL_TXRX_FRM_802_11_MGMT,
+                            ANI_TXDIR_TODS,
+                            7,//SMAC_SWBD_TX_TID_MGMT_HIGH,
+                            limTxComplete, pFrame, txFlag );
+    if ( ! HAL_STATUS_SUCCESS ( halstatus ) )
+    {
+        limLog( pMac, LOGE, FL("could not send marker frame for"
+                               " remain on channel!" ));
+        //Pkt will be freed up by the callback
+        nSirStatus = eSIR_FAILURE;
+        goto end;
+    }
+
+    nSirStatus = eSIR_SUCCESS;
+
+end:
+    vos_mem_free( pPublicVendorSpecific );
+    return nSirStatus;
+}
+
+/*-------------------------------------------------------------------------
+ *
+ * This function forms message for start of remain on channel with channel
+ * number, duration and sequence number. This message is added as data of
+ * vendor specific information element of Debug Marker Frame. Message will
+ * be in form "START-REMAIN-ON-CHANNEL<first/second-frame>-CHN=<channel>"
+ * "-FOR-DUR=<duraion>-SEQ=<sequence-num>"
+ *
+ *-------------------------------------------------------------------------*/
+eHalStatus limPrepareAndSendStartRemainOnChannelMsg(tpAniSirGlobal pMac,
+                      tSirRemainOnChnReq *MsgRemainonChannel, tANI_U8 id)
+{
+    tANI_U8 *startRemainOnChannelMsg;
+    eHalStatus status = eHAL_STATUS_SUCCESS;
+
+    startRemainOnChannelMsg = vos_mem_malloc( REMAIN_ON_CHANNEL_MSG_SIZE );
+    if( NULL == startRemainOnChannelMsg )
+    {
+        limLog(pMac, LOGE,
+                FL("Unable to allocate memory for remain on channel message"));
+        return eHAL_STATUS_FAILURE;
+    }
+
+    snprintf(startRemainOnChannelMsg, REMAIN_ON_CHANNEL_MSG_SIZE,
+            "START-REMAIN-ON-CHANNEL%d-CHN=%d-FOR-DUR=%ld-SEQ=%ld",
+            id, MsgRemainonChannel->chnNum, MsgRemainonChannel->duration,
+            pMac->lim.remOnChnSeqNum);
+
+    if( eSIR_FAILURE == limSendRemainOnChannelDebugMarkerFrame(pMac,
+                                                      startRemainOnChannelMsg) )
+    {
+        limLog( pMac, LOGE,
+                "%s: Could not send %d debug marker frame at start"
+                " of remain on channel", __func__, id);
+        status = eHAL_STATUS_FAILURE;
+    }
+    vos_mem_free( startRemainOnChannelMsg );
+
+    return status;
+
+}
+
+/*----------------------------------------------------------------------------
+ *
+ * This function forms message for cancel of remain on channel. This message
+ * is added as data of Vendor Specific information element of debug marker
+ * frame.Message will be in form "CANCEL-REMAIN-ON-CHANNEL<first/second-frame>"
+ * "-SEQ=<sequence-num>"
+ *
+ *----------------------------------------------------------------------------*/
+eHalStatus limPrepareAndSendCancelRemainOnChannelMsg(tpAniSirGlobal pMac,
+                                                               tANI_U8 id)
+{
+    tANI_U8 *cancelRemainOnChannelMsg;
+    eHalStatus status = eHAL_STATUS_SUCCESS;
+
+    cancelRemainOnChannelMsg = vos_mem_malloc( REMAIN_ON_CHANNEL_MSG_SIZE );
+    if( NULL == cancelRemainOnChannelMsg )
+    {
+        limLog( pMac, LOGE,
+                FL( "Unable to allocate memory for end of"
+                    " remain on channel message" ));
+        return eHAL_STATUS_FAILURE;
+    }
+
+    snprintf(cancelRemainOnChannelMsg, REMAIN_ON_CHANNEL_MSG_SIZE,
+            "CANCEL-REMAIN-ON-CHANNEL%d-SEQ=%ld",
+            id, pMac->lim.remOnChnSeqNum);
+    if( eSIR_FAILURE == limSendRemainOnChannelDebugMarkerFrame(pMac,
+                                                 cancelRemainOnChannelMsg) )
+    {
+        limLog( pMac, LOGE,
+                "%s: Could not send %d marker frame to debug cancel"
+                " remain on channel", __func__, id);
+        status = eHAL_STATUS_FAILURE;
+    }
+    vos_mem_free( cancelRemainOnChannelMsg );
+
+    return status;
+
+}
+
 /*------------------------------------------------------------------
  *
  * Below function is callback function, it is called when 
@@ -108,11 +285,26 @@ eHalStatus limP2PActionCnf(tpAniSirGlobal pMac, tANI_U32 txCompleteSuccess);
  *------------------------------------------------------------------*/
 void limSetLinkStateP2PCallback(tpAniSirGlobal pMac, void *callbackArg)
 {
+    tSirRemainOnChnReq *MsgRemainonChannel = pMac->lim.gpLimRemainOnChanReq;
+
     //Send Ready on channel indication to SME
     if(pMac->lim.gpLimRemainOnChanReq)
     {
         limSendSmeRsp(pMac, eWNI_SME_REMAIN_ON_CHN_RDY_IND, eHAL_STATUS_SUCCESS, 
                      pMac->lim.gpLimRemainOnChanReq->sessionId, 0); 
+        if(pMac->lim.gDebugP2pRemainOnChannel)
+        {
+            if( eHAL_STATUS_SUCCESS == limPrepareAndSendStartRemainOnChannelMsg(
+                                        pMac,
+                                        MsgRemainonChannel,
+                                        REMAIN_ON_CHANNEL_SECOND_MARKER_FRAME) )
+            {
+                limLog( pMac, LOG1,
+                        "%s: Successfully sent 2nd Marker frame "
+                        "seq num = %ld on start ROC", __func__,
+                        pMac->lim.remOnChnSeqNum);
+            }
+        }
     }
     else
     {
@@ -194,10 +386,9 @@ int limProcessRemainOnChnlReq(tpAniSirGlobal pMac, tANI_U32 *pMsg)
                 }
 #endif
 
-                if ((limSetLinkState(pMac, MsgBuff->isProbeRequestAllowed?
-                                     eSIR_LINK_LISTEN_STATE:eSIR_LINK_SEND_ACTION_STATE,
-                                     nullBssid, pMac->lim.gSelfMacAddr,
-                                     limSetLinkStateP2PCallback, NULL)) != eSIR_SUCCESS)
+                if ((limSetLinkState(pMac, eSIR_LINK_LISTEN_STATE,
+                    nullBssid, pMac->lim.gSelfMacAddr, 
+                    limSetLinkStateP2PCallback, NULL)) != eSIR_SUCCESS)
                 {
                     limLog( pMac, LOGE, "Unable to change link state");
                     goto error;
@@ -378,9 +569,29 @@ void limRemainOnChnlSetLinkStat(tpAniSirGlobal pMac, eHalStatus status,
         goto error;
     }
 
-    if ((limSetLinkState(pMac, MsgRemainonChannel->isProbeRequestAllowed?
-                         eSIR_LINK_LISTEN_STATE:eSIR_LINK_SEND_ACTION_STATE,nullBssid,
-                         pMac->lim.gSelfMacAddr, limSetLinkStateP2PCallback, 
+    if (eSIR_SUCCESS !=
+        wlan_cfgGetInt(pMac, WNI_CFG_DEBUG_P2P_REMAIN_ON_CHANNEL,
+                       (tANI_U32 *)&pMac->lim.gDebugP2pRemainOnChannel))
+    {
+        limLog( pMac, LOGE,
+                "%s: Couldn't get WNI_CFG_DEBUG_P2P_REMAIN_ON_CHANNEL value",
+                 __func__);
+        pMac->lim.gDebugP2pRemainOnChannel = 0;
+    }
+    if (pMac->lim.gDebugP2pRemainOnChannel)
+    {
+        pMac->lim.remOnChnSeqNum++;
+        if( eHAL_STATUS_SUCCESS == limPrepareAndSendStartRemainOnChannelMsg(
+                                     pMac, MsgRemainonChannel,
+                                     REMAIN_ON_CHANNEL_FIRST_MARKER_FRAME) )
+        {
+            limLog( pMac, LOG1,
+                    "%s: Successfully sent 1st marker frame with seq num = %ld"
+                    " on start ROC", __func__, pMac->lim.remOnChnSeqNum);
+        }
+    }
+    if ((limSetLinkState(pMac, eSIR_LINK_LISTEN_STATE,nullBssid,
+                         pMac->lim.gSelfMacAddr, limSetLinkStateP2PCallback,
                          NULL)) != eSIR_SUCCESS)
     {
         limLog( pMac, LOGE, "Unable to change link state");
@@ -466,6 +677,29 @@ void limConvertActiveChannelToPassiveChannel(tpAniSirGlobal pMac )
 
 /*------------------------------------------------------------------
  *
+ * limSetLinkState callback function.
+ *
+ *------------------------------------------------------------------*/
+void limSetlinkStateCallback(tpAniSirGlobal pMac, void *callbackArg)
+{
+    if(pMac->lim.gDebugP2pRemainOnChannel)
+    {
+        if (eHAL_STATUS_SUCCESS == limPrepareAndSendCancelRemainOnChannelMsg(
+                                      pMac,
+                                      REMAIN_ON_CHANNEL_SECOND_MARKER_FRAME))
+        {
+            limLog( pMac, LOG1,
+                    "%s: Successfully sent 2nd marker frame with seq num=%ld"
+                    " on cancel ROC", __func__, pMac->lim.remOnChnSeqNum);
+        }
+    }
+
+    return;
+
+}
+
+/*------------------------------------------------------------------
+ *
  * limchannelchange callback, on success channel change, set the
  * link_state to LISTEN
  *
@@ -493,9 +727,21 @@ void limProcessRemainOnChnTimeout(tpAniSirGlobal pMac)
         return;
     }
 
+    if(pMac->lim.gDebugP2pRemainOnChannel)
+    {
+        if (eHAL_STATUS_SUCCESS == limPrepareAndSendCancelRemainOnChannelMsg(
+                                        pMac,
+                                        REMAIN_ON_CHANNEL_FIRST_MARKER_FRAME))
+        {
+            limLog( pMac, LOG1,
+                    "%s: Successfully sent 1st marker frame with seqnum = %ld"
+                    " on cancel ROC", __func__, pMac->lim.remOnChnSeqNum);
+        }
+    }
+
     /* get the previous valid LINK state */
     if (limSetLinkState(pMac, eSIR_LINK_IDLE_STATE, nullBssid,
-        pMac->lim.gSelfMacAddr, NULL, NULL) != eSIR_SUCCESS)
+        pMac->lim.gSelfMacAddr, limSetlinkStateCallback, NULL) != eSIR_SUCCESS)
     {
         limLog( pMac, LOGE, "Unable to change link state");
         return;
@@ -603,7 +849,7 @@ void limRemainOnChnRsp(tpAniSirGlobal pMac, eHalStatus status, tANI_U32 *data)
     limSendSmeRsp(pMac, eWNI_SME_REMAIN_ON_CHN_RSP, status, 
                   MsgRemainonChannel->sessionId, 0);
 
-    vos_mem_free(pMac->lim.gpLimRemainOnChanReq);
+    palFreeMemory( pMac->hHdd, pMac->lim.gpLimRemainOnChanReq );
     pMac->lim.gpLimRemainOnChanReq = NULL;
 
     pMac->lim.gLimMlmState = pMac->lim.gLimPrevMlmState;
@@ -636,14 +882,14 @@ void limSendSmeMgmtFrameInd(
 
     length = sizeof(tSirSmeMgmtFrameInd) + frameLen;
 
-    pSirSmeMgmtFrame = vos_mem_malloc(length);
-    if (NULL == pSirSmeMgmtFrame)
+    if( eHAL_STATUS_SUCCESS !=
+         palAllocateMemory( pMac->hHdd, (void **)&pSirSmeMgmtFrame, length ))
     {
         limLog(pMac, LOGP,
-               FL("AllocateMemory failed for eWNI_SME_LISTEN_RSP"));
+               FL("palAllocateMemory failed for eWNI_SME_LISTEN_RSP"));
         return;
     }
-    vos_mem_set((void*)pSirSmeMgmtFrame, length, 0);
+    palZeroMemory(pMac->hHdd, (void*)pSirSmeMgmtFrame, length);
 
     pSirSmeMgmtFrame->mesgType = eWNI_SME_MGMT_FRM_IND;
     pSirSmeMgmtFrame->mesgLen = length;
@@ -677,8 +923,8 @@ void limSendSmeMgmtFrameInd(
 
     pSirSmeMgmtFrame->rxChan = rxChannel;
 
-    vos_mem_zero(pSirSmeMgmtFrame->frameBuf, frameLen);
-    vos_mem_copy(pSirSmeMgmtFrame->frameBuf, frame, frameLen);
+    vos_mem_zero(pSirSmeMgmtFrame->frameBuf,frameLen);
+    vos_mem_copy(pSirSmeMgmtFrame->frameBuf,frame,frameLen);
 
     mmhMsg.type = eWNI_SME_MGMT_FRM_IND;
     mmhMsg.bodyptr = pSirSmeMgmtFrame;
@@ -769,9 +1015,9 @@ void limSetHtCaps(tpAniSirGlobal pMac, tpPESession psessionEntry, tANI_U8 *pIeSt
         pHtcap->lsigTXOPProtection = dot11HtCap.lsigTXOPProtection;
         pHtcap->maxRxAMPDUFactor = dot11HtCap.maxRxAMPDUFactor;
         pHtcap->mpduDensity = dot11HtCap.mpduDensity;
-        vos_mem_copy((void *)pHtcap->supportedMCSSet,
-                     (void *)(dot11HtCap.supportedMCSSet),
-                      sizeof(pHtcap->supportedMCSSet));
+        palCopyMemory( pMac->hHdd, (void *)pHtcap->supportedMCSSet,
+                       (void *)(dot11HtCap.supportedMCSSet),
+                        sizeof(pHtcap->supportedMCSSet));
         pHtcap->pco = dot11HtCap.pco;
         pHtcap->transitionTime = dot11HtCap.transitionTime;
         pHtcap->mcsFeedback = dot11HtCap.mcsFeedback;
@@ -904,8 +1150,8 @@ void limSendP2PActionFrame(tpAniSirGlobal pMac, tpSirMsgQ pMsg)
                 tpSirMacP2PActionFrameHdr pActionHdr =
                     (tpSirMacP2PActionFrameHdr)((v_U8_t *)pMbMsg->data +
                                                         ACTION_OFFSET);
-                if (vos_mem_compare( pActionHdr->Oui,
-                    SIR_MAC_P2P_OUI, SIR_MAC_P2P_OUI_SIZE ) &&
+                if ( palEqualMemory( pMac->hHdd, pActionHdr->Oui,
+                     SIR_MAC_P2P_OUI, SIR_MAC_P2P_OUI_SIZE ) &&
                     (SIR_MAC_ACTION_P2P_SUBTYPE_PRESENCE_RSP ==
                     pActionHdr->OuiSubType))
                 { //In case of Presence RSP response
@@ -1031,22 +1277,22 @@ void limSendP2PActionFrame(tpAniSirGlobal pMac, tpSirMsgQ pMsg)
     }
 
     // Paranoia:
-    vos_mem_set(pFrame, nBytes, 0);
+    palZeroMemory( pMac->hHdd, pFrame, nBytes );
 
     if ((noaLen > 0) && (noaLen<(SIR_MAX_NOA_ATTR_LEN + SIR_P2P_IE_HEADER_LEN)))
     {
         // Add 2 bytes for length and Arribute field
         v_U32_t nBytesToCopy = ((pP2PIe + origLen + 2 ) -
                                 (v_U8_t *)pMbMsg->data);
-        vos_mem_copy(pFrame, pMbMsg->data, nBytesToCopy);
-        vos_mem_copy((pFrame + nBytesToCopy), noaStream, noaLen);
-        vos_mem_copy((pFrame + nBytesToCopy + noaLen),
-        pMbMsg->data + nBytesToCopy, nBytes - nBytesToCopy - noaLen);
+        palCopyMemory( pMac->hHdd, pFrame, pMbMsg->data, nBytesToCopy);
+        palCopyMemory( pMac->hHdd, (pFrame + nBytesToCopy), noaStream, noaLen);
+        palCopyMemory( pMac->hHdd, (pFrame + nBytesToCopy + noaLen),
+            pMbMsg->data + nBytesToCopy, nBytes - nBytesToCopy - noaLen);
 
     }
     else
     {
-        vos_mem_copy(pFrame, pMbMsg->data, nBytes);
+        palCopyMemory(pMac->hHdd, pFrame, pMbMsg->data, nBytes);
     }
 
     /* Use BD rate 2 for all P2P related frames. As these frames need to go
@@ -1119,15 +1365,15 @@ tSirRetStatus __limProcessSmeNoAUpdate(tpAniSirGlobal pMac, tANI_U32 *pMsgBuf)
 
     pNoA = (tpP2pPsConfig) pMsgBuf;
 
-    pMsgNoA = vos_mem_malloc(sizeof( tP2pPsConfig ));
-    if (NULL == pMsgNoA)
+    if( eHAL_STATUS_SUCCESS != palAllocateMemory(
+                  pMac->hHdd, (void **) &pMsgNoA, sizeof( tP2pPsConfig )))
     {
         limLog( pMac, LOGE,
                      FL( "Unable to allocate memory during NoA Update" ));
         return eSIR_MEM_ALLOC_FAILED;
     }
 
-    vos_mem_set((tANI_U8 *)pMsgNoA, sizeof(tP2pPsConfig), 0);
+    palZeroMemory( pMac->hHdd, (tANI_U8 *)pMsgNoA, sizeof(tP2pPsConfig));
     pMsgNoA->opp_ps = pNoA->opp_ps;
     pMsgNoA->ctWindow = pNoA->ctWindow;
     pMsgNoA->duration = pNoA->duration;

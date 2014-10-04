@@ -65,7 +65,7 @@ tANI_U8         limCompareCapabilities(tpAniSirGlobal,
                                        tSirAssocReq *,
                                        tSirMacCapabilityInfo *,tpPESession);
 tANI_U8         limCheckRxBasicRates(tpAniSirGlobal, tSirMacRateSet,tpPESession);
-tANI_U8         limCheckRxRSNIeMatch(tpAniSirGlobal, tDot11fIERSN, tpPESession, tANI_U8, tANI_BOOLEAN *);
+tANI_U8         limCheckRxRSNIeMatch(tpAniSirGlobal, tDot11fIERSN, tpPESession, tANI_U8);
 tANI_U8         limCheckRxWPAIeMatch(tpAniSirGlobal, tDot11fIEWPA, tpPESession, tANI_U8);
 tANI_U8         limCheckMCSSet(tpAniSirGlobal pMac, tANI_U8* supportedMCSSet);
 void            limPostDummyToTmRing(tpAniSirGlobal, tpDphHashNode);
@@ -91,6 +91,7 @@ tSirRetStatus limPopulatePeerRateSet(tpAniSirGlobal pMac,
                                                                 tANI_U8 basicOnly,
                                                                 tpPESession psessionEntry);
 #endif
+
 #ifdef WLAN_FEATURE_11AC
 tSirRetStatus limPopulateOwnRateSet(tpAniSirGlobal pMac,
                                          tpSirSupportedRates pRates,
@@ -191,15 +192,6 @@ void limFillRxHighestSupportedRate(tpAniSirGlobal pMac, tANI_U16 *rxHighestRate,
 #if  defined (WLAN_FEATURE_VOWIFI_11R) || defined (FEATURE_WLAN_CCX) || defined(FEATURE_WLAN_LFR)
 void limSendRetryReassocReqFrame(tpAniSirGlobal pMac, tLimMlmReassocReq *pMlmReassocReq, tpPESession psessionEntry);
 #endif
-#ifdef WLAN_FEATURE_11W
-void limSendSmeUnprotectedMgmtFrameInd(tpAniSirGlobal pMac, tANI_U8 frameType,
-                                       tANI_U8  *frame, tANI_U32 frameLen, tANI_U16 sessionId, tpPESession psessionEntry);
-#endif
-
-#if defined(FEATURE_WLAN_CCX) && defined(FEATURE_WLAN_CCX_UPLOAD)
-void limSendSmeTsmIEInd( tpAniSirGlobal pMac, tpPESession psessionEntry,
-                            tANI_U8 tid, tANI_U8 state, tANI_U16 measInterval);
-#endif /* FEATURE_WLAN_CCX && FEATURE_WLAN_CCX_UPLOAD */
 
 
 #endif /* __LIM_ASSOC_UTILS_H */
