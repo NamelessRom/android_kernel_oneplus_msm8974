@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2013, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012-2014 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -18,26 +18,15 @@
  * TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
  * PERFORMANCE OF THIS SOFTWARE.
  */
+
 /*
- * Copyright (c) 2012, The Linux Foundation. All rights reserved.
- *
- * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
- *
- *
- * Permission to use, copy, modify, and/or distribute this software for
- * any purpose with or without fee is hereby granted, provided that the
- * above copyright notice and this permission notice appear in all
- * copies.
- *
- * THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL
- * WARRANTIES WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED
- * WARRANTIES OF MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE
- * AUTHOR BE LIABLE FOR ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL
- * DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR
- * PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER
- * TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
- * PERFORMANCE OF THIS SOFTWARE.
+ * This file was originally distributed by Qualcomm Atheros, Inc.
+ * under proprietary terms before Copyright ownership was assigned
+ * to the Linux Foundation.
  */
+
+
+
 
 #ifndef WLAN_QCT_WLANTL_H
 #define WLAN_QCT_WLANTL_H
@@ -51,17 +40,6 @@
 DESCRIPTION
   This file contains the external API exposed by the wlan transport layer
   module.
-<<<<<<< HEAD:CORE/TL/inc/wlan_qct_tl.h
-  
-      
-  Copyright (c) 2008 QUALCOMM Incorporated. All Rights Reserved.
-  Qualcomm Confidential and Proprietary
-=======
-
-
-  Copyright (c) 2008 Qualcomm Technologies, Inc. All Rights Reserved.
-  Qualcomm Technologies Confidential and Proprietary
->>>>>>> 326d6cf... wlan: remove obsolete ANI_CHIPSET_VOLANS featurization:prima/CORE/TL/inc/wlan_qct_tl.h
 ===========================================================================*/
 
 
@@ -293,9 +271,9 @@ typedef struct
  /*Flag to indicate if STA is a WAPI STA*/
   v_U8_t         ucIsWapiSta;
 
-#ifdef FEATURE_WLAN_CCX
- /*Flag to indicate if STA is a CCX STA*/
-  v_U8_t         ucIsCcxSta;
+#ifdef FEATURE_WLAN_ESE
+ /*Flag to indicate if STA is a ESE STA*/
+  v_U8_t         ucIsEseSta;
 #endif
 
   /*DPU Signature used for broadcast data - used for data caching*/
@@ -430,6 +408,8 @@ typedef struct
 
   /* STA has more packets to send */
   v_BOOL_t  bMorePackets;
+  /* notifying TL if this is an ARP frame or not */
+  v_U8_t    ucIsArp;
 }WLANTL_MetaInfoType;
 
 /*---------------------------------------------------------------------------
@@ -449,6 +429,91 @@ typedef struct
  #endif
 }WLANTL_RxMetaInfoType;
 
+#ifdef WLAN_FEATURE_LINK_LAYER_STATS
+/* per interface per access category statistics */
+typedef PACKED_PRE struct PACKED_POST
+{
+  /* access category (VI, VO, BE, BK) */
+  v_U8_t            ac;
+
+  /*Number of successfully transmitted unicast data pkts (ACK rcvd) */
+  v_U32_t           txMpdu;
+
+  /* number of received unicast mpdu */
+  v_U32_t           rxMpdu;
+
+ /* umber of succesfully transmitted multicast data packets
+  * STA case: implies ACK received from AP for the unicast packet in which mcast
+  * pkt was sent
+  */
+  v_U32_t           txMcast;
+
+  /* number of received multicast data packets */
+  v_U32_t           rxMcast;
+
+  /* number of received unicast a-mpdu */
+  v_U32_t           rxAmpdu;
+
+  /* number of transmitted unicast a-mpdus */
+  v_U32_t           txAmpdu;
+
+  /* number of data pkt losses (no ACK) */
+  v_U32_t           mpduLost;
+
+  /* total number of data pkt retries */
+  v_U32_t           retries;
+
+  /* number of short data pkt retries */
+  v_U32_t           retriesShort;
+
+  /* number of long data pkt retries */
+  v_U32_t           retriesLong;
+
+  /* data pkt min contention time (usecs) */
+  v_U32_t           contentionTimeMin;
+
+  /* data pkt max contention time (usecs) */
+  v_U32_t           contentionTimeMax;
+
+  /* data pkt avg contention time (usecs) */
+  v_U32_t           contentionTimeAvg;
+
+  /* num of data pkts used for contention statistics */
+  v_U32_t           contentionNumSamples;
+}WLANTL_AccessCategoryStatsType;
+
+/* per interface statistics */
+typedef PACKED_PRE struct PACKED_POST
+{
+  /* access point beacon received count from connected AP */
+  v_U32_t               beaconRx;
+
+  /* access point mgmt frames received count from connected AP (including
+   * Beacon)
+   */
+  v_U32_t               mgmtRx;
+
+  /* action frames received count */
+  v_U32_t               mgmtActionRx;
+
+  /* action frames transmit count */
+  v_U32_t               mgmtActionTx;
+
+  /* access Point Beacon and Management frames RSSI (averaged) */
+  v_U32_t               rssiMgmt;
+
+  /* access Point Data Frames RSSI (averaged) from connected AP */
+  v_U32_t               rssiData;
+
+  /* access Point ACK RSSI (averaged) from connected AP */
+  v_U32_t               rssiAck;
+
+  WLANTL_AccessCategoryStatsType    accessCategoryStats[WLANTL_MAX_AC];
+
+}WLANTL_InterfaceStatsType;
+
+
+#endif
 
 /*---------------------------------------------------------------------------
   Handoff support and statistics defines and enum types
@@ -1106,6 +1171,44 @@ WLANTL_ClearSTAClient
   v_U8_t           ucSTAId 
 );
 
+#ifdef WLAN_FEATURE_LINK_LAYER_STATS
+/*==========================================================================
+
+  FUNCTION    WLANTL_CollectStats
+
+  DESCRIPTION
+    Utility function used by TL to send the statitics
+
+  DEPENDENCIES
+
+
+  PARAMETERS
+
+    IN
+
+    ucSTAId:    station for which the statistics need to collected
+
+    vosDataBuff: it will contain the pointer to the corresponding
+                structure
+
+  RETURN VALUE
+    The result code associated with performing the operation
+
+    VOS_STATUS_E_INVAL:   Input parameters are invalid
+    VOS_STATUS_SUCCESS:   Everything is good :)
+
+  SIDE EFFECTS
+
+============================================================================*/
+VOS_STATUS
+WLANTL_CollectInterfaceStats
+(
+  v_PVOID_t       pvosGCtx,
+  v_U8_t          ucSTAId,
+  WLANTL_InterfaceStatsType  *vosDataBuff
+);
+#endif
+
 /*===========================================================================
 
   FUNCTION    WLANTL_ChangeSTAState
@@ -1751,7 +1854,7 @@ WLANTL_TxMgmtFrm
   v_U8_t               tid,
   WLANTL_TxCompCBType  pfnCompTxFunc,
   v_PVOID_t            voosBDHeader,
-  v_U8_t               ucAckResponse
+  v_U32_t              ucAckResponse
 );
 
 
@@ -2969,6 +3072,31 @@ v_VOID_t
 WLANTL_TLDebugMessage
 (
   v_BOOL_t displaySnapshot
+);
+
+/*==========================================================================
+  FUNCTION   WLANTL_FatalError
+
+  DESCRIPTION
+    Fatal error reported in TX path, post an event to TX Thread for further
+    handling
+
+  DEPENDENCIES
+    The TL must be initialized before this gets called.
+
+  PARAMETERS
+
+    VOID
+
+  RETURN VALUE      None
+
+  SIDE EFFECTS
+
+============================================================================*/
+v_VOID_t
+WLANTL_FatalError
+(
+ v_VOID_t
 );
 
 #endif /* #ifndef WLAN_QCT_WLANTL_H */
