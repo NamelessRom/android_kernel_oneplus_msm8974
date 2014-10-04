@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2013, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012-2014, The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -129,6 +129,7 @@ typedef struct TdlsSendMgmtInfo
   tANI_U8 dialog;
   tANI_U16 statusCode;
   tANI_U8 responder;
+  tANI_U32 peerCapability;
   tANI_U8 *buf;
   tANI_U8 len;
 } tTdlsSendMgmtCmdInfo;
@@ -339,5 +340,6 @@ eHalStatus csrCreateRoamScanChannelList(tpAniSirGlobal pMac,
                                                 tANI_U8 numChannels,
                                                 const eCsrBand eBand);
 #endif
+void activeListCmdTimeoutHandle(void *userData);
 
 #endif //#if !defined( __SMEINSIDE_H )
