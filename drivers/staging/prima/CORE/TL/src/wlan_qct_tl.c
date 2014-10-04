@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2013, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012-2014, The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -1328,6 +1328,20 @@ WLANTL_RegisterSTAClient
   pClientSTA->vosAMSDUChainRoot = NULL;
 
 
+  /* Reorder LOCK
+   * During handle normal RX frame within RX thread,
+   * if MC thread try to preempt, ADDBA, DELBA, TIMER
+   * Context should be protected from race */
+  for (ucTid = 0; ucTid < WLAN_MAX_TID ; ucTid++)
+  {
+    if (!VOS_IS_STATUS_SUCCESS(
+        vos_lock_init(&pClientSTA->atlBAReorderInfo[ucTid].reorderLock)))
+    {
+       TLLOGE(VOS_TRACE(VOS_MODULE_ID_TL, VOS_TRACE_LEVEL_ERROR,
+              "Lock Init Fail"));
+       return VOS_STATUS_E_FAILURE;
+    }
+  }
   /*--------------------------------------------------------------------
     Stats info
     --------------------------------------------------------------------*/
@@ -1495,9 +1509,10 @@ WLANTL_ClearSTAClient
   }
 
   /* Delete BA sessions on all TID's */
-  for ( ucIndex = 0; ucIndex < WLAN_MAX_TID ; ucIndex++) 
+  for (ucIndex = 0; ucIndex < WLAN_MAX_TID ; ucIndex++)
   {
-     WLANTL_BaSessionDel (pvosGCtx, ucSTAId, ucIndex);
+     WLANTL_BaSessionDel(pvosGCtx, ucSTAId, ucIndex);
+     vos_lock_destroy(&pTLCb->atlSTAClients[ucSTAId]->atlBAReorderInfo[ucIndex].reorderLock);
   }
 
 #ifdef FEATURE_WLAN_TDLS
@@ -5509,6 +5524,11 @@ WLANTL_RxFrames
     return VOS_STATUS_E_INVAL;
   }
 
+ /*------------------------------------------------------------------------
+   Popolaute timestamp as the time when packet arrives
+   ---------------------------------------------------------------------- */
+   vosDataBuff->timestamp = vos_timer_get_system_ticks();
+
   /*------------------------------------------------------------------------
     Extract TL control block
    ------------------------------------------------------------------------*/
@@ -7839,9 +7859,9 @@ WLANTL_FwdPktToHDD
          return vosStatus;
       }
 
-      TLLOG4(VOS_TRACE( VOS_MODULE_ID_TL, VOS_TRACE_LEVEL_INFO_LOW,"station mac 0x%x 0x%x 0x%x 0x%x 0x%x 0x%x \n",
-                       pDestMacAddress->bytes[0], pDestMacAddress->bytes[1], pDestMacAddress->bytes[2],
-                       pDestMacAddress->bytes[3], pDestMacAddress->bytes[4], pDestMacAddress->bytes[5]));
+      TLLOG4(VOS_TRACE( VOS_MODULE_ID_TL, VOS_TRACE_LEVEL_INFO_LOW,
+                        "station mac "MAC_ADDRESS_STR,
+                        MAC_ADDR_ARRAY(pDestMacAddress->bytes)));
 
       if (vos_is_macaddr_broadcast( pDestMacAddress ) || vos_is_macaddr_group(pDestMacAddress))
       {

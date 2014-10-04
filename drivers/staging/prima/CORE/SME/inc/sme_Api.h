@@ -1171,6 +1171,18 @@ extern eHalStatus sme_RegisterPowerSaveCheck (
    tANI_BOOLEAN (*checkRoutine) (void *checkContext), void *checkContext);
 
 /* ---------------------------------------------------------------------------
+    \fn sme_Register11dScanDoneCallback
+    \brief  Register a routine of type csrScanCompleteCallback which is
+            called whenever an 11d scan is done
+    \param  hHal - The handle returned by macOpen.
+    \param  callback -  11d scan complete routine to be registered
+    \return eHalStatus
+  ---------------------------------------------------------------------------*/
+extern eHalStatus sme_Register11dScanDoneCallback (
+   tHalHandle hHal,
+   csrScanCompleteCallback);
+
+/* ---------------------------------------------------------------------------
     \fn sme_DeregisterPowerSaveCheck
     \brief  Deregister a power save check routine
     \param  hHal - The handle returned by macOpen.
@@ -1485,6 +1497,8 @@ typedef void ( *tSmeChangeCountryCallback)(void *pContext);
 
     \param pCountry New Country Code String
 
+    \param sendRegHint If we want to send reg hint to nl80211
+
     \return eHalStatus  SUCCESS.
 
                          FAILURE or RESOURCES  The API finished and failed.
@@ -1495,7 +1509,8 @@ eHalStatus sme_ChangeCountryCode( tHalHandle hHal,
                                   tANI_U8 *pCountry,
                                   void *pContext,
                                   void* pVosContext,
-                                  tAniBool countryFromUserSpace );
+                                  tAniBool countryFromUserSpace,
+                                  tAniBool sendRegHint);
 
 /* ---------------------------------------------------------------------------
 
@@ -1844,16 +1859,6 @@ eHalStatus sme_SetKeepAlive (tHalHandle hHal, tANI_U8 sessionId,
                                   tpSirKeepAliveReq pRequest);
 
 
-/* ---------------------------------------------------------------------------
-    \fn sme_AbortMacScan
-    \brief  API to cancel MAC scan.
-    \param  hHal - The handle returned by macOpen.
-    \return VOS_STATUS
-            VOS_STATUS_E_FAILURE - failure
-            VOS_STATUS_SUCCESS  success
-  ---------------------------------------------------------------------------*/
-eHalStatus sme_AbortMacScan(tHalHandle hHal);
-
 /* ----------------------------------------------------------------------------
    \fn sme_GetOperationChannel
    \brief API to get current channel on which STA is parked
@@ -2038,7 +2043,7 @@ tANI_U8 sme_GetConcurrentOperationChannel( tHalHandle hHal );
             VOS_STATUS_E_FAILURE - failure
             VOS_STATUS_SUCCESS  success
   ---------------------------------------------------------------------------*/
-eHalStatus sme_AbortMacScan(tHalHandle hHal);
+eHalStatus sme_AbortMacScan(tHalHandle hHal, eCsrAbortReason reason);
 
 /* ---------------------------------------------------------------------------
     \fn sme_GetCfgValidChannels
@@ -3149,4 +3154,23 @@ sme_StopBatchScanInd
 );
 
 #endif
+
+eHalStatus sme_RoamDelPMKIDfromCache( tHalHandle hHal, tANI_U8 sessionId, tANI_U8 *pBSSId );
+
+#ifdef FEATURE_WLAN_CH_AVOID
+/* ---------------------------------------------------------------------------
+    \fn sme_AddChAvoidCallback
+    \brief  Used to plug in callback function
+            Which notify channel may not be used with SAP or P2PGO mode.
+            Notification come from FW.
+    \param  hHal
+    \param  pCallbackfn : callback function pointer should be plugged in
+    \- return eHalStatus
+    -------------------------------------------------------------------------*/
+eHalStatus sme_AddChAvoidCallback
+(
+   tHalHandle hHal,
+   void (*pCallbackfn)(void *pAdapter, void *indParam)
+);
+#endif /* FEATURE_WLAN_CH_AVOID */
 #endif //#if !defined( __SME_API_H )

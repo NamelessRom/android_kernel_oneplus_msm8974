@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2013, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012-2014, The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -411,6 +411,10 @@ typedef enum
   WDI_BATCH_SCAN_RESULT_IND,
 #endif
 
+#ifdef FEATURE_WLAN_CH_AVOID
+  WDI_CH_AVOID_IND,
+#endif /* FEATURE_WLAN_CH_AVOID */
+
   WDI_MAX_IND
 }WDI_LowLevelIndEnumType;
 
@@ -731,6 +735,22 @@ typedef struct
    wpt_macAddr staMacAddr;
 }WDI_IbssPeerInactivityIndType;
 
+#ifdef FEATURE_WLAN_CH_AVOID
+#define WDI_CH_AVOID_MAX_RANGE   4
+
+typedef struct
+{
+   wpt_uint32 startFreq;
+   wpt_uint32 endFreq;
+} WDI_ChAvoidFreqType;
+
+typedef struct
+{
+   wpt_uint32          avoidRangeCount;
+   WDI_ChAvoidFreqType avoidFreqRange[WDI_CH_AVOID_MAX_RANGE];
+} WDI_ChAvoidIndType;
+#endif /* FEATURE_WLAN_CH_AVOID */
+
 /*---------------------------------------------------------------------------
   WDI_LowLevelIndType
     Inidcation type and information about the indication being carried
@@ -796,6 +816,9 @@ typedef struct
     void *pBatchScanResult;
 #endif
 
+#ifdef FEATURE_WLAN_CH_AVOID
+    WDI_ChAvoidIndType          wdiChAvoidInd;
+#endif /* FEATURE_WLAN_CH_AVOID */
   }  wdiIndicationData;
 }WDI_LowLevelIndType;
 
@@ -4781,7 +4804,6 @@ typedef struct
 
 #define WDI_ROAM_SCAN_MAX_CHANNELS       80 /* NUM_RF_CHANNELS */
 #define WDI_ROAM_SCAN_MAX_PROBE_SIZE     450
-#define WDI_ROAM_SCAN_RESERVED_BYTES     61
 
 typedef struct
 {
@@ -4821,6 +4843,7 @@ typedef struct
   wpt_boolean RoamScanOffloadEnabled;
   wpt_boolean MAWCEnabled;
   wpt_uint8   LookupThreshold;
+  wpt_uint8   RxSensitivityThreshold;
   wpt_uint8   RoamRssiDiff;
   wpt_uint8   ChannelCacheType;
   wpt_uint8   Command;
@@ -4846,7 +4869,6 @@ typedef struct
   WDI_MobilityDomainInfo  MDID;
   wpt_uint8               nProbes;
   wpt_uint16              HomeAwayTime;
-  wpt_uint8               ReservedBytes[WDI_ROAM_SCAN_RESERVED_BYTES];
 } WDI_RoamOffloadScanInfo;
 
 typedef struct
