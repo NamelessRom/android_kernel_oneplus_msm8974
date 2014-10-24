@@ -24,8 +24,11 @@
 #include <linux/platform_device.h>
 #include <linux/of.h>
 
+unsigned int poll_interval = 750;
+module_param(poll_interval, int, 0644);
+
 unsigned int temp_threshold = 70;
-module_param(temp_threshold, int, 0755);
+module_param(temp_threshold, int, 0644);
 
 static struct thermal_info {
 	uint32_t cpuinfo_max_freq;
@@ -141,7 +144,7 @@ static void check_temp(struct work_struct *work)
 	}
 
 reschedule:
-	schedule_delayed_work_on(0, &check_temp_work, msecs_to_jiffies(250));
+	schedule_delayed_work_on(0, &check_temp_work, msecs_to_jiffies(poll_interval));
 }
 
 static int __devinit msm_thermal_dev_probe(struct platform_device *pdev)
