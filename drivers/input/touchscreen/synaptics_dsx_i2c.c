@@ -1432,6 +1432,33 @@ static int synaptics_rmi4_proc_flashlight_write(struct file *filp, const char __
 	return len;
 }
 
+static int synaptics_rmi4_proc_haptic_feedback_read(char *page, char **start, off_t off,
+		int count, int *eof, void *data)
+{
+	return sprintf(page, "%d\n", atomic_read(&syna_rmi4_data->haptic_feedback_enable));
+}
+
+static int synaptics_rmi4_proc_haptic_feedback_write(struct file *filp, const char __user *buff,
+		unsigned long len, void *data)
+{
+	int enable;
+	char buf[2];
+
+	if (len > 2)
+		return 0;
+
+	if (copy_from_user(buf, buff, len)) {
+		print_ts(TS_DEBUG, KERN_ERR "Read proc input error.\n");
+		return -EFAULT;
+	}
+
+	enable = (buf[0] == '0') ? 0 : 1;
+
+	atomic_set(&syna_rmi4_data->haptic_feedback_enable, enable);
+
+	return len;
+}
+
 //smartcover proc read function
 static int synaptics_rmi4_proc_smartcover_read(char *page, char **start, off_t off,
 		int count, int *eof, void *data) {
@@ -1702,6 +1729,13 @@ static int synaptics_rmi4_init_touchpanel_proc(void)
 	if (proc_entry) {
 		proc_entry->write_proc = synaptics_rmi4_proc_flashlight_write;
 		proc_entry->read_proc = synaptics_rmi4_proc_flashlight_read;
+	}
+
+	// use haptic feedback
+	proc_entry = create_proc_entry("haptic_feedback_enable", 0664, procdir);
+	if (proc_entry) {
+		proc_entry->write_proc = synaptics_rmi4_proc_haptic_feedback_write;
+		proc_entry->read_proc = synaptics_rmi4_proc_haptic_feedback_read;
 	}
 
 	//for pdoze enable/disable interface
@@ -3986,6 +4020,7 @@ static int synaptics_rmi4_set_input_dev(struct synaptics_rmi4_data *rmi4_data)
 	atomic_set(&rmi4_data->camera_enable, 0);
 	atomic_set(&rmi4_data->music_enable, 0);
 	atomic_set(&rmi4_data->flashlight_enable, 0);
+	atomic_set(&rmi4_data->haptic_feedback_enable, 0);
 
 	rmi4_data->glove_enable = 0;
 	rmi4_data->pdoze_enable = 0;
