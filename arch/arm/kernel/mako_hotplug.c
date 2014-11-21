@@ -27,7 +27,9 @@
 #include <linux/delay.h>
 #include <linux/input.h>
 #include <linux/jiffies.h>
+#if 0
 #include <linux/lcd_notify.h>
+#endif
 
 #define MAKO_HOTPLUG "mako_hotplug"
 
@@ -337,6 +339,7 @@ static void __ref mako_hotplug_resume(struct work_struct *work)
 	pr_info("%s: resume\n", MAKO_HOTPLUG);
 }
 
+#if 0
 static int lcd_notifier_callback(struct notifier_block *this,
 	unsigned long event, void *data)
 {
@@ -350,6 +353,7 @@ static int lcd_notifier_callback(struct notifier_block *this,
 
 	return NOTIFY_OK;
 }
+#endif
 
 /*
  * Sysfs get/set entries start
@@ -553,12 +557,14 @@ static int __devinit mako_hotplug_probe(struct platform_device *pdev)
 	t->min_time_cpu_online = DEFAULT_MIN_TIME_CPU_ONLINE;
 	t->timer = DEFAULT_TIMER;
 
+#if 0
 	stats.notif.notifier_call = lcd_notifier_callback;
 
 	if (lcd_register_client(&stats.notif)) {
 		ret = -EINVAL;
 		goto err;
 	}
+#endif
 
 	ret = misc_register(&mako_hotplug_control_device);
 	if (ret) {
