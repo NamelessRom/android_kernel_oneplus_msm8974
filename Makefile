@@ -357,7 +357,10 @@ CC		= $(srctree)/scripts/gcc-wrapper.py $(REAL_CC)
 CHECKFLAGS     := -D__linux__ -Dlinux -D__STDC__ -Dunix -D__unix__ \
 		  -Wbitwise -Wno-return-void $(CF)
 
-KERNELFLAGS	= -munaligned-access -fforce-addr -fsingle-precision-constant -mcpu=cortex-a15 -mtune=cortex-a15 -marm -mfpu=neon-vfpv4 -fgcse-las
+KERNELFLAGS	= -munaligned-access -fforce-addr -fsingle-precision-constant \
+		  -mcpu=cortex-a15 -mtune=cortex-a15 -marm -mfpu=neon-vfpv4 \
+		  -fgcse-las -ffast-math -fsingle-precision-constant \
+		  -mvectorize-with-neon-quad
 MODFLAGS	= -DMODULE $(KERNELFLAGS)
 CFLAGS_MODULE   = $(MODFLAGS)
 AFLAGS_MODULE   = $(MODFLAGS)
@@ -381,8 +384,7 @@ KBUILD_CFLAGS   := -Wall -DNDEBUG -Wundef -Wstrict-prototypes -Wno-trigraphs \
 		   -Werror-implicit-function-declaration \
 		   -Wno-format-security \
 		   -fno-delete-null-pointer-checks \
-		   -mcpu=cortex-a15 -mtune=cortex-a15 -mfpu=neon-vfpv4 -marm \
-		   -ffast-math -fsingle-precision-constant \
+		   $(KERNEL_FLAGS) \
 		   -fgcse-lm -fgcse-sm -fsched-spec-load -fforce-addr
 
 KBUILD_AFLAGS_KERNEL :=
