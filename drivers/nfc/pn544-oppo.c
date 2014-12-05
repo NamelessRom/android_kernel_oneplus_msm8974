@@ -99,6 +99,22 @@ static void mainboard_verify(void)
 			mainboard_info.version = "13";
 			mainboard_info.manufacture = "SD";
 			break;
+               case HW_VERSION__20:
+                       mainboard_info.version ="20";
+                       mainboard_info.manufacture = "SA";
+                       break;
+               case HW_VERSION__21:
+                       mainboard_info.version = "21";
+                       mainboard_info.manufacture = "SB";
+                       break;
+               case HW_VERSION__22:
+                       mainboard_info.version = "22";
+                       mainboard_info.manufacture = "SC";
+                       break;
+               case HW_VERSION__23:
+                       mainboard_info.version = "23";
+                       mainboard_info.manufacture = "SD";
+                       break;
 		default:
 			mainboard_info.version = "UNKOWN";
 			mainboard_info.manufacture = "UNKOWN";
