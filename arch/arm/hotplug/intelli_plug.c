@@ -52,7 +52,7 @@ static struct delayed_work intelli_plug_boost;
 static struct workqueue_struct *intelliplug_wq;
 static struct workqueue_struct *intelliplug_boost_wq;
 
-static unsigned int intelli_plug_active = 1;
+static unsigned int intelli_plug_active = 0;
 module_param(intelli_plug_active, uint, 0644);
 
 static unsigned int touch_boost_active = 1;
@@ -201,13 +201,12 @@ static unsigned int calculate_thread_stats(void)
 
 static void __cpuinit intelli_plug_boost_fn(struct work_struct *work)
 {
-
-	int nr_cpus = num_online_cpus();
-
 	if (intelli_plug_active)
-		if (touch_boost_active)
+		if (touch_boost_active) {
+			int nr_cpus = num_online_cpus();
 			if (nr_cpus < 2)
 				cpu_up(1);
+		}
 }
 
 /*
