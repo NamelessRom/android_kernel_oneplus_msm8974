@@ -33,6 +33,7 @@
 
 #define MAKO_HOTPLUG "mako_hotplug"
 
+#define DEFAULT_HOTPLUG_ENABLED 1
 #define DEFAULT_LOAD_THRESHOLD 80
 #define DEFAULT_HIGH_LOAD_COUNTER 10
 #define DEFAULT_MAX_LOAD_COUNTER 20
@@ -64,6 +65,11 @@ struct cpu_stats {
 };
 
 struct hotplug_tunables {
+	/**
+	 * whether make_hotplug is enabled or not
+	 */
+	unsigned int enabled;
+
 	/*
 	 * system load threshold to decide when online or offline cores
 	 * from 0 to 100
@@ -207,6 +213,9 @@ static void __ref decide_hotplug_func(struct work_struct *work)
 	unsigned int cpu;
 	unsigned int online_cpus = num_online_cpus();
 
+	if (!t->enabled)
+		goto reschedule;
+
 	/*
 	 * reschedule early when the system has woken up from the FREEZER
 	 * but the display is not on
@@ -297,8 +306,12 @@ static void screen_off_max_freq(int cpu, bool lower_max_freq)
 
 static void mako_hotplug_suspend(struct work_struct *work)
 {
+	struct hotplug_tunables *t = &tunables;
 	struct cpufreq_policy *policy = cpufreq_cpu_get(0);
 	int cpu;
+
+	if (!t->enabled)
+		return;
 
 	/*
 	 * Save the current max freq before capping it to 1GHz
@@ -311,11 +324,11 @@ static void mako_hotplug_suspend(struct work_struct *work)
 		stats.saved_freq = policy->max;
 
 	/*
-         * Simple lock not for concurrent accesses, but to prevent
-         * the notifier to trigger a policy limits verify unless we
-         * requested it
-         */
-        stats.screen_cap_lock = true;
+	 * Simple lock not for concurrent accesses, but to prevent
+	 * the notifier to trigger a policy limits verify unless we
+	 * requested it
+	 */
+	stats.screen_cap_lock = true;
 	for_each_online_cpu(cpu) {
 		if (cpu < 2) {
 			screen_off_max_freq(cpu, true);
@@ -334,7 +347,11 @@ static void mako_hotplug_suspend(struct work_struct *work)
 
 static void __ref mako_hotplug_resume(struct work_struct *work)
 {
+	struct hotplug_tunables *t = &tunables;
 	int cpu;
+
+	if (!t->enabled)
+		return;
 
 	stats.screen_cap_lock = true;
 	for_each_possible_cpu(cpu) {
@@ -371,6 +388,30 @@ static int lcd_notifier_callback(struct notifier_block *this,
 /*
  * Sysfs get/set entries start
  */
+
+static ssize_t make_hotplug_enabled_show(struct device *dev,
+		struct device_attribute *attr, char *buf)
+{
+	struct hotplug_tunables *t = &tunables;
+
+	return snprintf(buf, PAGE_SIZE, "%u\n", t->enabled);
+}
+
+static ssize_t make_hotplug_enabled_store(struct device *dev,
+		struct device_attribute *attr, const char *buf, size_t size)
+{
+	struct hotplug_tunables *t = &tunables;
+	int ret;
+	unsigned long new_val;
+
+	ret = kstrtoul(buf, 0, &new_val);
+	if (ret < 0)
+		return ret;
+
+	t->enabled = new_val > 1 ? 1 : new_val;
+
+	return size;
+}
 
 static ssize_t load_threshold_show(struct device *dev,
 		struct device_attribute *attr, char *buf)
@@ -516,6 +557,8 @@ static ssize_t timer_store(struct device *dev, struct device_attribute *attr,
 	return size;
 }
 
+static DEVICE_ATTR(enabled, 0664, make_hotplug_enabled_show,
+		make_hotplug_enabled_store);
 static DEVICE_ATTR(load_threshold, 0664, load_threshold_show,
 		load_threshold_store);
 static DEVICE_ATTR(high_load_counter, 0664, high_load_counter_show,
@@ -529,6 +572,7 @@ static DEVICE_ATTR(min_time_cpu_online, 0664, min_time_cpu_online_show,
 static DEVICE_ATTR(timer, 0664, timer_show, timer_store);
 
 static struct attribute *mako_hotplug_control_attributes[] = {
+	&dev_attr_enabled.attr,
 	&dev_attr_load_threshold.attr,
 	&dev_attr_high_load_counter.attr,
 	&dev_attr_max_load_counter.attr,
@@ -563,6 +607,7 @@ static int __devinit mako_hotplug_probe(struct platform_device *pdev)
 		goto err;
 	}
 
+	t->enabled = DEFAULT_HOTPLUG_ENABLED;
 	t->load_threshold = DEFAULT_LOAD_THRESHOLD;
 	t->high_load_counter = DEFAULT_HIGH_LOAD_COUNTER;
 	t->max_load_counter = DEFAULT_MAX_LOAD_COUNTER;
