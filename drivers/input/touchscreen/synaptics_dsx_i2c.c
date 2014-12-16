@@ -1564,56 +1564,6 @@ static int synaptics_rmi4_proc_smartcover_write(struct file *filp, const char __
 	return len;
 }
 
-//glove proc read function
-static int synaptics_rmi4_proc_glove_read(char *page, char **start, off_t off,
-		int count, int *eof, void *data)
-{
-	int len = 0;
-	unsigned int enable;
-
-	enable = (syna_rmi4_data->glove_enable)?1:0;
-
-	len = sprintf(page, "%d\n", enable);
-
-	return len;
-}
-
-//glove proc write function
-static int synaptics_rmi4_proc_glove_write(struct file *filp, const char __user *buff,
-		unsigned long len, void *data)
-{
-	int retval;
-	unsigned char val[1];
-	unsigned char bak;
-	unsigned int enable;
-	char buf[2];
-
-	if (len > 2)
-		return 0;
-
-	if (copy_from_user(buf, buff, len)) {
-		print_ts(TS_DEBUG, KERN_ERR "Read proc input error.\n");
-		return -EFAULT;
-	}
-
-	enable = (buf[0] == '0') ? 0 : 1;
-	bak = syna_rmi4_data->glove_enable;
-	syna_rmi4_data->glove_enable &= 0x00;
-	if (enable)
-		syna_rmi4_data->glove_enable |= 0x01;
-	if (bak == syna_rmi4_data->glove_enable)
-		return len;
-
-	print_ts(TS_DEBUG, KERN_ERR "glove enable=0x%x\n", syna_rmi4_data->glove_enable);
-
-	retval = synaptics_rmi4_i2c_read(syna_rmi4_data,SYNA_ADDR_GLOVE_FLAG,val,sizeof(val));
-
-	val[0] = syna_rmi4_data->glove_enable & 0xff;
-	retval = synaptics_rmi4_i2c_write(syna_rmi4_data,SYNA_ADDR_GLOVE_FLAG,val,sizeof(val));
-
-	return (retval == sizeof(val)) ? len : 0;
-}
-
 //pdoze proc read function
 static int synaptics_rmi4_proc_pdoze_read(char *page, char **start, off_t off,
 		int count, int *eof, void *data) {
@@ -1695,13 +1645,6 @@ static int synaptics_rmi4_init_touchpanel_proc(void)
 	struct proc_dir_entry *proc_entry=0;
 
 	struct proc_dir_entry *procdir = proc_mkdir( "touchpanel", NULL );
-
-	//glove mode inteface
-	proc_entry = create_proc_entry("glove_mode_enable", 0664, procdir);
-	if (proc_entry) {
-		proc_entry->write_proc = synaptics_rmi4_proc_glove_write;
-		proc_entry->read_proc = synaptics_rmi4_proc_glove_read;
-	}
 
 	// double tap to wake
 	proc_entry = create_proc_entry("double_tap_enable", 0664, procdir);
@@ -4860,7 +4803,6 @@ static void synaptics_rmi4_late_resume(struct early_suspend *h)
 static int synaptics_rmi4_suspend(struct device *dev)
 {
 	struct synaptics_rmi4_data *rmi4_data = dev_get_drvdata(dev);
-	unsigned char val = 0;
 
 	if (rmi4_data->pwrrunning)
 		return 0;
@@ -4869,10 +4811,6 @@ static int synaptics_rmi4_suspend(struct device *dev)
 
 	if (rmi4_data->smartcover_enable)
 		synaptics_rmi4_close_smartcover();
-
-	if (rmi4_data->glove_enable)
-		synaptics_rmi4_i2c_write(syna_rmi4_data, SYNA_ADDR_GLOVE_FLAG,
-				&val, sizeof(val));
 
 	atomic_set(&rmi4_data->syna_use_gesture,
 			atomic_read(&rmi4_data->double_tap_enable) ||
@@ -4931,7 +4869,6 @@ void synaptics_rmi4_sync_lcd_resume(void) {
 static int synaptics_rmi4_resume(struct device *dev)
 {
 	int retval;
-	unsigned char val = 1;
 	struct synaptics_rmi4_data *rmi4_data = dev_get_drvdata(dev);
 
 	if (rmi4_data->pwrrunning)
@@ -4941,10 +4878,6 @@ static int synaptics_rmi4_resume(struct device *dev)
 
 	if (rmi4_data->smartcover_enable)
 		synaptics_rmi4_open_smartcover();
-
-	if (rmi4_data->glove_enable)
-		synaptics_rmi4_i2c_write(syna_rmi4_data, SYNA_ADDR_GLOVE_FLAG,
-				&val, sizeof(val));
 
 	if (atomic_read(&rmi4_data->syna_use_gesture) || rmi4_data->pdoze_enable) {
 		synaptics_enable_gesture(rmi4_data,false);
