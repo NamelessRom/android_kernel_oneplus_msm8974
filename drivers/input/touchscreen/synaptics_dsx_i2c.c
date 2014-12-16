@@ -1564,6 +1564,7 @@ static int synaptics_rmi4_proc_smartcover_write(struct file *filp, const char __
 	return len;
 }
 
+#if 0
 //glove proc read function
 static int synaptics_rmi4_proc_glove_read(char *page, char **start, off_t off,
 		int count, int *eof, void *data)
@@ -1613,6 +1614,7 @@ static int synaptics_rmi4_proc_glove_write(struct file *filp, const char __user 
 
 	return (retval == sizeof(val)) ? len : 0;
 }
+#endif
 
 //pdoze proc read function
 static int synaptics_rmi4_proc_pdoze_read(char *page, char **start, off_t off,
@@ -1696,12 +1698,14 @@ static int synaptics_rmi4_init_touchpanel_proc(void)
 
 	struct proc_dir_entry *procdir = proc_mkdir( "touchpanel", NULL );
 
+#if 0
 	//glove mode inteface
 	proc_entry = create_proc_entry("glove_mode_enable", 0664, procdir);
 	if (proc_entry) {
 		proc_entry->write_proc = synaptics_rmi4_proc_glove_write;
 		proc_entry->read_proc = synaptics_rmi4_proc_glove_read;
 	}
+#endif
 
 	// double tap to wake
 	proc_entry = create_proc_entry("double_tap_enable", 0664, procdir);
@@ -4870,9 +4874,11 @@ static int synaptics_rmi4_suspend(struct device *dev)
 	if (rmi4_data->smartcover_enable)
 		synaptics_rmi4_close_smartcover();
 
+#if 0
 	if (rmi4_data->glove_enable)
 		synaptics_rmi4_i2c_write(syna_rmi4_data, SYNA_ADDR_GLOVE_FLAG,
 				&val, sizeof(val));
+#endif
 
 	atomic_set(&rmi4_data->syna_use_gesture,
 			atomic_read(&rmi4_data->double_tap_enable) ||
@@ -4942,9 +4948,11 @@ static int synaptics_rmi4_resume(struct device *dev)
 	if (rmi4_data->smartcover_enable)
 		synaptics_rmi4_open_smartcover();
 
+#if 0
 	if (rmi4_data->glove_enable)
 		synaptics_rmi4_i2c_write(syna_rmi4_data, SYNA_ADDR_GLOVE_FLAG,
 				&val, sizeof(val));
+#endif
 
 	if (atomic_read(&rmi4_data->syna_use_gesture) || rmi4_data->pdoze_enable) {
 		synaptics_enable_gesture(rmi4_data,false);
