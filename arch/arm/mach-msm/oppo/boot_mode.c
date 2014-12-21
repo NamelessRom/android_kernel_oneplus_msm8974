@@ -21,22 +21,6 @@
 #include <linux/boot_mode.h>
 
 static int ftm_mode = MSM_BOOT_MODE__NORMAL;
-static int __init board_mfg_mode_init(char *str)
-{
-	if (!strncmp(str, "factory2", 5))
-		ftm_mode = MSM_BOOT_MODE__FACTORY;
-	else if (!strncmp(str, "ftmwifi", 5))
-		ftm_mode = MSM_BOOT_MODE__WLAN;
-	else if (!strncmp(str, "ftmrf", 5))
-		ftm_mode = MSM_BOOT_MODE__RF;
-	else if (!strncmp(str, "ftmrecovery", 5))
-		ftm_mode = MSM_BOOT_MODE__RECOVERY;
-
-	pr_debug("%s: ftm_mode=%d\n", __func__, ftm_mode);
-
-	return 1;
-}
-__setup("oppo_ftm_mode=", board_mfg_mode_init);
 
 int get_boot_mode(void)
 {
@@ -50,6 +34,19 @@ static int __init boot_mode_init(char *str)
 	strcpy(boot_mode, str);
 
 	pr_debug("%s: parse boot_mode is %s\n", __func__, boot_mode);
+
+	if (!strcmp(boot_mode, "normal"))
+		ftm_mode = MSM_BOOT_MODE__NORMAL;
+	else if (!strcmp(boot_mode, "factory"))
+		ftm_mode = MSM_BOOT_MODE__FACTORY;
+	else if (!strcmp(boot_mode, "recovery"))
+		ftm_mode = MSM_BOOT_MODE__RECOVERY;
+	else if (!strcmp(boot_mode, "charger"))
+		ftm_mode = MSM_BOOT_MODE__CHARGE;
+	else
+		ftm_mode = MSM_BOOT_MODE__NORMAL;
+
+	printk(KERN_INFO "%s: parse ftm_mode is %d\n", __func__, ftm_mode);
 
 	return 1;
 }
