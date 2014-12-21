@@ -318,6 +318,9 @@ static void mako_hotplug_suspend(struct work_struct *work)
 	if (!t->enabled)
 		return;
 
+	if (stats.suspend)
+		return;
+
 	/*
 	 * Save the current max freq before capping it to 1GHz
 	 * so that we can restore it after screen on.
@@ -356,6 +359,9 @@ static void __ref mako_hotplug_resume(struct work_struct *work)
 	int cpu;
 
 	if (!t->enabled)
+		return;
+
+	if (!stats.suspend)
 		return;
 
 	stats.screen_cap_lock = true;
