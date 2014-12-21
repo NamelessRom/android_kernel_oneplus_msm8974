@@ -995,9 +995,6 @@ qpnp_chg_iusb_trim_set(struct qpnp_chg_chip *chip, int trim)
 static int
 qpnp_chg_iusbmax_set(struct qpnp_chg_chip *chip, int mA)
 {
-	if (get_boot_mode() != MSM_BOOT_MODE__NORMAL)
-		return -EINVAL;
-
 	if (mA < QPNP_CHG_I_MAX_MIN_100
 			|| mA > QPNP_CHG_I_MAX_MAX_MA) {
 		pr_err("bad mA=%d asked to set\n", mA);
@@ -1193,9 +1190,6 @@ qpnp_chg_usb_iusbmax_get(struct qpnp_chg_chip *chip)
 static int
 qpnp_chg_usb_suspend_enable(struct qpnp_chg_chip *chip, int enable)
 {
-	if (get_boot_mode() != MSM_BOOT_MODE__NORMAL && !enable)
-		return -EINVAL;
-
 	if (qpnp_ext_charger && qpnp_ext_charger->chg_usb_suspend_enable) {
 		return qpnp_ext_charger->chg_usb_suspend_enable(enable);
 	} else {
@@ -1218,9 +1212,6 @@ qpnp_chg_usb_suspend_enable(struct qpnp_chg_chip *chip, int enable)
 static int
 qpnp_chg_charge_en(struct qpnp_chg_chip *chip, int enable)
 {
-	if (get_boot_mode() != MSM_BOOT_MODE__NORMAL)
-		return -EINVAL;
-
 	if (qpnp_ext_charger && qpnp_ext_charger->chg_charge_en) {
 		return qpnp_ext_charger->chg_charge_en(enable);
 	} else {
@@ -2834,16 +2825,19 @@ static int
 get_prop_batt_status(struct qpnp_chg_chip *chip)
 {
 	int status;
+	int usb_present = qpnp_chg_is_usb_chg_plugged_in(chip);
 
 #ifdef CONFIG_PIC1503_FASTCG
-	if (get_prop_fast_chg_started(chip) == true)
-		return POWER_SUPPLY_STATUS_CHARGING;
+	if (get_prop_fast_chg_started(chip) == true) {
+		if (usb_present)
+			return POWER_SUPPLY_STATUS_CHARGING;
+		else
+			return POWER_SUPPLY_STATUS_DISCHARGING;
+	}
 #endif
 
-	if (qpnp_chg_is_usb_chg_plugged_in(chip) &&
-			chip->chg_display_full) {
+	if (usb_present && chip->chg_display_full)
 		return POWER_SUPPLY_STATUS_FULL;
-	}
 
 	if (get_prop_batt_temp(chip) <= AUTO_CHARGING_BATT_REMOVE_TEMP) {
 		return POWER_SUPPLY_STATUS_DISCHARGING;
@@ -2857,14 +2851,17 @@ get_prop_batt_status(struct qpnp_chg_chip *chip)
 	}
 
 	if ((status & 0x30) == 0x10) {
-		return POWER_SUPPLY_STATUS_CHARGING;
+		if (usb_present)
+			return POWER_SUPPLY_STATUS_CHARGING;
 	} else if ((status & 0x30) == 0x20) {
-		return POWER_SUPPLY_STATUS_CHARGING;
+		if (usb_present)
+			return POWER_SUPPLY_STATUS_CHARGING;
 	} else if ((status & 0x30) == 0x30) {
-		return POWER_SUPPLY_STATUS_CHARGING;
-	} else {
-		return POWER_SUPPLY_STATUS_DISCHARGING;
+		if (usb_present)
+			return POWER_SUPPLY_STATUS_CHARGING;
 	}
+
+	return POWER_SUPPLY_STATUS_DISCHARGING;
 }
 #else
 static int
@@ -7232,11 +7229,6 @@ qpnp_charger_probe(struct spmi_device *spmi)
 
 #ifndef CONFIG_BQ24196_CHARGER
 	qpnp_chg_charge_en(chip, !chip->charging_disabled);
-#ifdef CONFIG_MACH_OPPO
-	if (get_boot_mode() != MSM_BOOT_MODE__NORMAL) {
-		qpnp_chg_usb_suspend_enable(chip, 1);
-	}
-#endif
 	qpnp_chg_force_run_on_batt(chip, chip->charging_disabled);
 #endif /* CONFIG_BQ24196_CHARGER */
 	qpnp_chg_set_appropriate_vddmax(chip);
