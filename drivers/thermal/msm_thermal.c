@@ -27,7 +27,7 @@
 unsigned int poll_interval = 750;
 module_param(poll_interval, int, 0644);
 
-unsigned int temp_threshold = 70;
+unsigned int temp_threshold = 75;
 module_param(temp_threshold, int, 0644);
 
 static struct thermal_info {
@@ -147,7 +147,7 @@ reschedule:
 	schedule_delayed_work_on(0, &check_temp_work, msecs_to_jiffies(poll_interval));
 }
 
-static int __devinit msm_thermal_dev_probe(struct platform_device *pdev)
+static int msm_thermal_dev_probe(struct platform_device *pdev)
 {
 	int ret = 0;
 	struct device_node *node = pdev->dev.of_node;
@@ -161,10 +161,10 @@ static int __devinit msm_thermal_dev_probe(struct platform_device *pdev)
 
 	WARN_ON(data.sensor_id >= TSENS_MAX_SENSORS);
 
-        memcpy(&msm_thermal_info, &data, sizeof(struct msm_thermal_data));
+	memcpy(&msm_thermal_info, &data, sizeof(struct msm_thermal_data));
 
-        INIT_DELAYED_WORK(&check_temp_work, check_temp);
-        schedule_delayed_work_on(0, &check_temp_work, 5);
+	INIT_DELAYED_WORK(&check_temp_work, check_temp);
+	schedule_delayed_work_on(0, &check_temp_work, 5);
 
 	cpufreq_register_notifier(&msm_thermal_cpufreq_notifier,
 			CPUFREQ_POLICY_NOTIFIER);
@@ -175,7 +175,7 @@ static int __devinit msm_thermal_dev_probe(struct platform_device *pdev)
 static int msm_thermal_dev_remove(struct platform_device *pdev)
 {
 	cpufreq_unregister_notifier(&msm_thermal_cpufreq_notifier,
-                        CPUFREQ_POLICY_NOTIFIER);
+						CPUFREQ_POLICY_NOTIFIER);
 	return 0;
 }
 
