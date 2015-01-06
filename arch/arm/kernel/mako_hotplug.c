@@ -27,7 +27,9 @@
 #include <linux/delay.h>
 #include <linux/input.h>
 #include <linux/jiffies.h>
-#include <linux/lcd_notify.h>
+#ifdef CONFIG_POWERSUSPEND
+#include <linux/powersuspend.h>
+#endif
 
 #define MAKO_HOTPLUG "mako_hotplug"
 
@@ -46,7 +48,6 @@
 
 struct cpu_stats {
 	unsigned int counter;
-	struct notifier_block notif;
 	u64 timestamp;
 	uint32_t freq;
 	uint32_t saved_freq;
@@ -380,24 +381,25 @@ static void __ref mako_hotplug_resume(struct work_struct *work)
 	pr_info("%s: resume\n", MAKO_HOTPLUG);
 }
 
-static int lcd_notifier_callback(struct notifier_block *this,
-	unsigned long event, void *data)
+#ifdef CONFIG_POWERSUSPEND
+static void __mako_hotplug_suspend(struct power_suspend *handler)
 {
-	struct hotplug_tunables *t = &tunables;
-
-	if (!t->enabled)
-		return NOTIFY_OK;
-
-	if (event == LCD_EVENT_ON_START) {
-		if (!stats.booted)
-			stats.booted = true;
-		else
-			queue_work_on(0, wq, &resume);
-	} else if (event == LCD_EVENT_OFF_START)
-		queue_work_on(0, wq, &suspend);
-
-	return NOTIFY_OK;
+	queue_work_on(0, wq, &suspend);
 }
+
+static void __mako_hotplug_resume(struct power_suspend *handler)
+{
+	if (!stats.booted)
+		stats.booted = true;
+	else
+		queue_work_on(0, wq, &resume);
+}
+
+static struct power_suspend mako_hotplug_power_suspend_driver = {
+	.suspend = __mako_hotplug_suspend,
+	.resume = __mako_hotplug_resume,
+};
+#endif
 
 /*
  * Sysfs get/set entries start
@@ -657,13 +659,6 @@ static int __devinit mako_hotplug_probe(struct platform_device *pdev)
 	t->timer = DEFAULT_TIMER;
 	t->screen_off_max = DEFAULT_MAX_FREQ_CAP;
 
-	stats.notif.notifier_call = lcd_notifier_callback;
-
-	if (lcd_register_client(&stats.notif)) {
-		ret = -EINVAL;
-		goto err;
-	}
-
 	ret = misc_register(&mako_hotplug_control_device);
 	if (ret) {
 		ret = -EINVAL;
@@ -676,6 +671,10 @@ static int __devinit mako_hotplug_probe(struct platform_device *pdev)
 		ret = -EINVAL;
 		goto err;
 	}
+
+#ifdef CONFIG_POWERSUSPEND
+	register_power_suspend(&mako_hotplug_power_suspend_driver);
+#endif
 
 	INIT_WORK(&resume, mako_hotplug_resume);
 	INIT_WORK(&suspend, mako_hotplug_suspend);
