@@ -152,7 +152,7 @@ CONFIG_PERF_USE_VMALLOC=y
 # Kernel Performance Events And Counters
 #
 CONFIG_PERF_EVENTS=y
-CONFIG_PERF_COUNTERS=y
+# CONFIG_PERF_COUNTERS is not set
 # CONFIG_DEBUG_PERF_USE_VMALLOC is not set
 CONFIG_VM_EVENT_COUNTERS=y
 # CONFIG_SLUB_DEBUG is not set
@@ -1784,7 +1784,7 @@ CONFIG_SERIAL_MSM_HS=y
 #
 # Diag Support
 #
-# CONFIG_DIAG_CHAR it not set
+# CONFIG_DIAG_CHAR is not set
 
 #
 # DIAG traffic over USB
