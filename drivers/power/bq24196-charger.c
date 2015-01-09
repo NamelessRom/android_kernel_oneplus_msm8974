@@ -47,6 +47,7 @@ struct bq24196_device_info {
 	struct i2c_client		*client;
 	struct task_struct		*feedwdt_task;
 	struct mutex			i2c_lock;
+	atomic_t suspended;
 
 	/* 300ms delay is needed after bq27541 is powered up
 	 * and before any successful I2C transaction
@@ -61,6 +62,10 @@ static int bq24196_read_i2c(struct bq24196_device_info *di,u8 reg,u8 length,char
 {
 	struct i2c_client *client = di->client;
 	int retval;
+
+	if (atomic_read(&di->suspended) == 1)
+		return -1;
+
 	mutex_lock(&bq24196_di->i2c_lock);
 	retval = i2c_smbus_read_i2c_block_data(client,reg,length,&buf[0]);
 	mutex_unlock(&bq24196_di->i2c_lock);
@@ -73,6 +78,10 @@ static int bq24196_write_i2c(struct bq24196_device_info *di,u8 reg,u8 length,cha
 {
 	struct i2c_client *client = di->client;
 	int retval;
+
+	if (atomic_read(&di->suspended) == 1)
+		return -1;
+
 	mutex_lock(&bq24196_di->i2c_lock);
 	retval = i2c_smbus_write_i2c_block_data(client,reg,length,&buf[0]);
 	mutex_unlock(&bq24196_di->i2c_lock);
@@ -520,6 +529,7 @@ static int bq24196_probe(struct i2c_client *client, const struct i2c_device_id *
 	di->client = client;
 	bq24196_client = client;
 	bq24196_di = di;
+	atomic_set(&di->suspended, 0);
 	mutex_init(&di->i2c_lock);
 	bq24196_hw_config_init(di);
 	
@@ -557,11 +567,35 @@ static const struct i2c_device_id bq24196_id[] = {
 };
 MODULE_DEVICE_TABLE(i2c, bq24196_id);
 
+static int bq24196_suspend(struct device *dev)
+{
+	struct bq24196_device_info *chip = dev_get_drvdata(dev);
+
+	atomic_set(&chip->suspended, 1);
+
+	return 0;
+}
+
+static int bq24196_resume(struct device *dev)
+{
+	struct bq24196_device_info *chip = dev_get_drvdata(dev);
+
+	atomic_set(&chip->suspended, 0);
+
+	return 0;
+}
+
+static const struct dev_pm_ops bq24196_pm_ops = {
+	.resume		= bq24196_resume,
+	.suspend		= bq24196_suspend,
+};
+
 static struct i2c_driver bq24196_charger_driver = {
 	.driver		= {
 		.name = "bq24196_charger",
 		.owner	= THIS_MODULE,
 		.of_match_table = bq24196_match,
+		.pm		= &bq24196_pm_ops,
 	},
 	.probe		= bq24196_probe,
 	.remove		= bq24196_remove,
