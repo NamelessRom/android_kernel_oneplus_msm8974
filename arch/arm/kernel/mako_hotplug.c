@@ -43,7 +43,7 @@
 #define DEFAULT_TIMER 1
 #define DEFAULT_MIN_CORES_ONLINE 2
 
-#define MIN_CPU_UP_US (500 * USEC_PER_MSEC)
+#define MIN_CPU_UP_US (200 * USEC_PER_MSEC)
 #define NUM_POSSIBLE_CPUS num_possible_cpus()
 #define HIGH_LOAD (95)
 
@@ -162,6 +162,9 @@ static void cpu_revive(unsigned int load)
 {
 	struct hotplug_tunables *t = &tunables;
 	unsigned int counter_hysteria = 3;
+
+	if (unlikely(nr_running() >= 10))
+		goto online_all;
 
 	/*
 	 * we should care about a very high load spike and online the
