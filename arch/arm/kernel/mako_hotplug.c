@@ -181,7 +181,7 @@ online_all:
 	stats.timestamp = ktime_to_us(ktime_get());
 }
 
-static void cpu_smash(void)
+static void cpu_smash(unsigned int load)
 {
 	struct hotplug_tunables *t = &tunables;
 	u64 extra_time = MIN_CPU_UP_US;
@@ -206,6 +206,13 @@ static void cpu_smash(void)
 		extra_time = t->min_time_cpu_online * MIN_CPU_UP_US;
 
 	if (ktime_to_us(ktime_get()) < stats.timestamp + extra_time)
+		return;
+
+	/*
+	 * If current load is higher than our threshold we can skip offlining
+	 * on the next sample
+	 */
+	if (load >= t->load_threshold)
 		return;
 
 	cpus_offline_work();
@@ -256,12 +263,22 @@ static void __ref decide_hotplug_func(struct work_struct *work)
 			--stats.counter;
 
 		if (online_cpus > t->min_cores_online)
-			cpu_smash();
+			cpu_smash(cur_load);
 	}
 
-reschedule:
-	queue_delayed_work_on(0, wq, &decide_hotplug,
+	queue_delayed_work(wq, &decide_hotplug,
 		msecs_to_jiffies(t->timer * HZ));
+
+	return;
+
+reschedule:
+	/*
+	 * This reschedule is specially for cases where the user wants to
+	 * run either dual-core or quad-core permanently - for that reason
+	 * we don't need to run this work every 100ms, but rather just
+	 * once every second
+	 */
+	queue_delayed_work(wq, &decide_hotplug, HZ);
 }
 
 static void mako_hotplug_suspend(struct work_struct *work)
@@ -281,7 +298,7 @@ static void __ref mako_hotplug_resume(struct work_struct *work)
 #ifdef CONFIG_POWERSUSPEND
 static void __mako_hotplug_suspend(struct power_suspend *handler)
 {
-	queue_work_on(0, wq, &suspend);
+	queue_work(wq, &suspend);
 }
 
 static void __mako_hotplug_resume(struct power_suspend *handler)
@@ -291,11 +308,11 @@ static void __mako_hotplug_resume(struct power_suspend *handler)
 		 * let's start messing with the cores only after
 		 * the device has booted up
 		 */
-		queue_delayed_work_on(0, wq, &decide_hotplug, 0);
+		queue_delayed_work(wq, &decide_hotplug, 0);
 		stats.booted = true;
 	}
 	else
-		queue_work_on(0, wq, &resume);
+		queue_work(wq, &resume);
 }
 
 static struct power_suspend mako_hotplug_power_suspend_driver = {
@@ -546,7 +563,9 @@ static int __devinit mako_hotplug_probe(struct platform_device *pdev)
 	int ret = 0;
 	struct hotplug_tunables *t = &tunables;
 
-	wq = alloc_workqueue("mako_hotplug_workqueue", WQ_FREEZABLE, 1);
+	wq = alloc_workqueue("mako_hotplug_workqueue",
+		WQ_FREEZABLE |
+		WQ_UNBOUND, 1);
 
 	if (!wq) {
 		ret = -ENOMEM;
