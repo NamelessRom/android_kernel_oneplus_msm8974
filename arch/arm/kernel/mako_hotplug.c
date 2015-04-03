@@ -34,7 +34,7 @@
 
 #define MAKO_HOTPLUG "mako_hotplug"
 
-#define DEFAULT_HOTPLUG_ENABLED 1
+#define DEFAULT_HOTPLUG_ENABLED 0
 #define DEFAULT_LOAD_THRESHOLD 80
 #define DEFAULT_HIGH_LOAD_COUNTER 10
 #define DEFAULT_MAX_LOAD_COUNTER 20
@@ -231,7 +231,7 @@ static void __ref decide_hotplug_func(struct work_struct *work)
 	unsigned int online_cpus = num_online_cpus();
 
 	if (!t->enabled)
-		goto reschedule;
+		return;
 
 	/*
 	 * reschedule early when the user doesn't want more than 2 cores online
@@ -281,6 +281,17 @@ reschedule:
 	queue_delayed_work(wq, &decide_hotplug, HZ * 2);
 }
 
+static void mako_hotplug_start(void)
+{
+	queue_delayed_work(wq, &decide_hotplug, HZ * 2);
+}
+
+static void mako_hotplug_stop(void)
+{
+	flush_workqueue(wq);
+	cancel_delayed_work_sync(&decide_hotplug);
+}
+
 static void mako_hotplug_suspend(struct work_struct *work)
 {
 	cpus_offline_work();
@@ -298,11 +309,21 @@ static void __ref mako_hotplug_resume(struct work_struct *work)
 #ifdef CONFIG_POWERSUSPEND
 static void __mako_hotplug_suspend(struct power_suspend *handler)
 {
+	struct hotplug_tunables *t = &tunables;
+
+	if (!t->enabled)
+		return;
+
 	queue_work(wq, &suspend);
 }
 
 static void __mako_hotplug_resume(struct power_suspend *handler)
 {
+	struct hotplug_tunables *t = &tunables;
+
+	if (!t->enabled)
+		return;
+
 	if (!stats.booted) {
 		/*
 		 * let's start messing with the cores only after
@@ -344,7 +365,16 @@ static ssize_t make_hotplug_enabled_store(struct device *dev,
 	if (ret < 0)
 		return ret;
 
-	t->enabled = new_val > 1 ? 1 : new_val;
+	new_val = new_val > 1 ? 1 : new_val;
+
+	if (t->enabled != new_val) {
+		if (t->enabled)
+			mako_hotplug_start();
+		else
+			mako_hotplug_stop();
+	}
+
+	t->enabled = new_val;
 
 	return size;
 }
