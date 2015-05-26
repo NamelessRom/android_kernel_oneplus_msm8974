@@ -138,6 +138,13 @@
 		qcom,model = "msm8974-taiko-mtp-snd-card";
 		qcom,cdc-micbias2-headset-only;
 	};
+
+	memory_hole: qcom,msm-mem-hole {
+		compatible = "qcom,msm-mem-hole";
+		qcom,memblock-remove = <0x5d00000 0x7d00000
+								0xfa00000 0x500000
+								0x05900000 0x100000>; /* Address and Size of Hole */
+	};
 };
 
 &pm8941_lsid1 {
