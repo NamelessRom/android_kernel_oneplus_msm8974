@@ -917,7 +917,9 @@ static int mdss_fb_probe(struct platform_device *pdev)
 			pr_err("led_classdev_register failed\n");
 		else {
 			lcd_backlight_registered = 1;
-			mfd->bl_level = backlight_led.brightness;
+			if (mfd->panel.type == MIPI_CMD_PANEL) {
+				mfd->bl_level = backlight_led.brightness;
+			}
 		}
 	}
 
