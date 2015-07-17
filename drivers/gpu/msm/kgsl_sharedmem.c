@@ -372,7 +372,7 @@ static int kgsl_page_alloc_vmfault(struct kgsl_memdesc *memdesc,
 
 static int kgsl_page_alloc_vmflags(struct kgsl_memdesc *memdesc)
 {
-	return VM_RESERVED | VM_DONTEXPAND | VM_DONTCOPY;
+	return VM_RESERVED | VM_DONTEXPAND;
 }
 
 static void kgsl_page_alloc_free(struct kgsl_memdesc *memdesc)
@@ -393,7 +393,7 @@ static void kgsl_page_alloc_free(struct kgsl_memdesc *memdesc)
 
 static int kgsl_contiguous_vmflags(struct kgsl_memdesc *memdesc)
 {
-	return VM_RESERVED | VM_IO | VM_PFNMAP | VM_DONTEXPAND | VM_DONTCOPY;
+	return VM_RESERVED | VM_IO | VM_PFNMAP | VM_DONTEXPAND;
 }
 
 /*
@@ -491,8 +491,7 @@ static struct kgsl_memdesc_ops kgsl_cma_ops = {
 	.vmfault = kgsl_contiguous_vmfault,
 };
 
-int kgsl_cache_range_op(struct kgsl_memdesc *memdesc, size_t offset,
-			size_t size, unsigned int op)
+void kgsl_cache_range_op(struct kgsl_memdesc *memdesc, int op)
 {
 	/*
 	 * If the buffer is mapped in the kernel operate on that address
@@ -502,16 +501,7 @@ int kgsl_cache_range_op(struct kgsl_memdesc *memdesc, size_t offset,
 	void *addr = (memdesc->hostptr) ?
 		memdesc->hostptr : (void *) memdesc->useraddr;
 
-	/* Check that offset+length does not exceed memdesc->size */
-	if ((offset + size) > memdesc->size)
-		return -ERANGE;
-
-	addr = addr + offset;
-
-	/*
-	 * The dmac_xxx_range functions handle addresses and sizes that
-	 * are not aligned to the cacheline size correctly.
-	 */
+	int size = memdesc->size;
 
 	if (addr !=  NULL) {
 		switch (op) {
@@ -527,8 +517,6 @@ int kgsl_cache_range_op(struct kgsl_memdesc *memdesc, size_t offset,
 		}
 	}
 	outer_cache_range_op_sg(memdesc->sg, memdesc->sglen, op);
-
-	return 0;
 }
 EXPORT_SYMBOL(kgsl_cache_range_op);
 
