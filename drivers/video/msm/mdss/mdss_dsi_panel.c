@@ -278,24 +278,35 @@ int mdss_dsi_panel_reset(struct mdss_panel_data *pdata, int enable)
 				gpio_set_value((ctrl_pdata->rst_gpio),
 					pdata->panel_info.rst_seq[i]);
 				if (pdata->panel_info.rst_seq[++i])
-					usleep(pinfo->rst_seq[i] * 1000);
+					mdelay(pinfo->rst_seq[i]);
 			}
 
 			if (gpio_is_valid(ctrl_pdata->disp_en_gpio))
 				gpio_set_value((ctrl_pdata->disp_en_gpio), 1);
 #ifdef CONFIG_MACH_OPPO
-			usleep(2 * 1000);
-			if (gpio_is_valid(ctrl_pdata->lcd_5v_en_gpio))
-				gpio_direction_output(ctrl_pdata->lcd_5v_en_gpio, 1);
+			gpio_direction_output((ctrl_pdata->disp_en_gpio),1);
+			mdelay(2);
 #endif
 		}
 
+#ifdef CONFIG_MACH_OPPO
+		gpio_direction_output((ctrl_pdata->lcd_5v_en_gpio),1);
+		mdelay(10);
+		gpio_direction_output((ctrl_pdata->lcd_5v_en_gpio),0);
+		mdelay(2);
+		gpio_direction_output((ctrl_pdata->disp_en_gpio),0);
+		mdelay(10);
+		gpio_direction_output((ctrl_pdata->disp_en_gpio),1);
+		mdelay(2);
+		gpio_direction_output((ctrl_pdata->lcd_5v_en_gpio),1);
+#else
 		if (gpio_is_valid(ctrl_pdata->mode_gpio)) {
 			if (pinfo->mode_gpio_state == MODE_GPIO_HIGH)
 				gpio_set_value((ctrl_pdata->mode_gpio), 1);
 			else if (pinfo->mode_gpio_state == MODE_GPIO_LOW)
 				gpio_set_value((ctrl_pdata->mode_gpio), 0);
 		}
+#endif
 		if (ctrl_pdata->ctrl_state & CTRL_STATE_PANEL_INIT) {
 			pr_debug("%s: Panel Not properly turned OFF\n",
 						__func__);
@@ -305,22 +316,26 @@ int mdss_dsi_panel_reset(struct mdss_panel_data *pdata, int enable)
 	} else {
 #ifdef CONFIG_MACH_OPPO
 		gpio_set_value((ctrl_pdata->rst_gpio), 1);
-		usleep(110 * 1000);
+		mdelay(5);
 #endif
 		gpio_set_value((ctrl_pdata->rst_gpio), 0);
-		gpio_free(ctrl_pdata->rst_gpio);
 #ifdef CONFIG_MACH_OPPO
-		usleep(10 * 1000);
-		if (gpio_is_valid(ctrl_pdata->lcd_5v_en_gpio))
-			gpio_direction_output(ctrl_pdata->lcd_5v_en_gpio, 0);
-		usleep(2 * 1000);
+		mdelay(10);
+		gpio_set_value((ctrl_pdata->rst_gpio), 1);
+		mdelay(10);
+		gpio_direction_output((ctrl_pdata->lcd_5v_en_gpio), 0);
+		mdelay(2);
 #endif
+		gpio_free(ctrl_pdata->rst_gpio);
 		if (gpio_is_valid(ctrl_pdata->disp_en_gpio)) {
 			gpio_set_value((ctrl_pdata->disp_en_gpio), 0);
+#ifdef CONFIG_MACH_OPPO
+			gpio_direction_output((ctrl_pdata->disp_en_gpio),0);
+#endif
 			gpio_free(ctrl_pdata->disp_en_gpio);
 		}
 #ifdef CONFIG_MACH_OPPO
-		usleep(10 * 1000);
+		mdelay(10);
 #endif
 		if (gpio_is_valid(ctrl_pdata->mode_gpio))
 			gpio_free(ctrl_pdata->mode_gpio);
