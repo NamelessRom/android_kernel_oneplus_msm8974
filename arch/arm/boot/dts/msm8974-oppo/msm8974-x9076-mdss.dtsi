@@ -17,6 +17,7 @@
 		qcom,mdss_fb_primary {
 			qcom,mdss-mixer-swap;
 			qcom,mdss-fb-split = <720 720>;
+			qcom,mdss-idle-power-collapse-enabled;
 		};
 	};
 
