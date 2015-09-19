@@ -1591,8 +1591,18 @@ int __cpufreq_driver_target(struct cpufreq_policy *policy,
 	if (cpufreq_disabled())
 		return -ENODEV;
 
+	/* Make sure that target_freq is within supported range */
+	if (target_freq > policy->max)
+		target_freq = policy->max;
+	if (target_freq < policy->min)
+		target_freq = policy->min;
+
 	pr_debug("target for CPU %u: %u kHz, relation %u\n", policy->cpu,
 		target_freq, relation);
+
+	if (policy->cur == target_freq)
+		return 0;
+
 	if (cpufreq_driver->target)
 		retval = cpufreq_driver->target(policy, target_freq, relation);
 
@@ -1629,6 +1639,9 @@ int __cpufreq_driver_getavg(struct cpufreq_policy *policy, unsigned int cpu)
 	int ret = 0;
 
 	if (!cpufreq_driver->getavg)
+		return 0;
+
+	if (cpufreq_disabled())
 		return 0;
 
 	policy = cpufreq_cpu_get(policy->cpu);
