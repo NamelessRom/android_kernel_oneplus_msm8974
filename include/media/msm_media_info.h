@@ -88,7 +88,7 @@ static inline unsigned int VENUS_EXTRADATA_SIZE(int width, int height)
 	 * In the future, calculate the size based on the w/h but just
 	 * hardcode it for now since 8K satisfies all current usecases.
 	 */
-#if defined(CONFIG_MACH_FIND7OP) || defined(ONEPLUS_CAMERA)
+#if defined(CONFIG_ONEPLUS_CAMERA) || defined(ONEPLUS_CAMERA)
 	// BREAK ALL THE tHINGS
 	return 0;
 #else

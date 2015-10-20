@@ -42,6 +42,9 @@ menuconfig OPPO_CAMERA
           Enable the old Oppo camera code
 
 if MSMB_CAMERA
+if ONEPLUS_CAMERA
+source "drivers/media/platform/msm/camera_oneplus_v2/Kconfig"
+endif
 if OPPO_CAMERA
 source "drivers/media/platform/msm/camera_oppo_v2/Kconfig"
 endif
