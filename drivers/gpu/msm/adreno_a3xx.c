@@ -1,4 +1,4 @@
-/* Copyright (c) 2012-2013, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2012-2014, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -13,6 +13,7 @@
 
 #include <linux/delay.h>
 #include <linux/sched.h>
+#include <linux/ratelimit.h>
 #include <mach/socinfo.h>
 
 #include "kgsl.h"
@@ -639,7 +640,6 @@ static void a3xx_fatal_err_callback(struct adreno_device *adreno_dev, int bit)
 static void a3xx_err_callback(struct adreno_device *adreno_dev, int bit)
 {
 	struct kgsl_device *device = &adreno_dev->dev;
-	const char *err = "";
 
 	switch (bit) {
 	case A3XX_INT_RBBM_AHB_ERROR: {
@@ -660,35 +660,46 @@ static void a3xx_err_callback(struct adreno_device *adreno_dev, int bit)
 
 		/* Clear the error */
 		kgsl_regwrite(device, A3XX_RBBM_AHB_CMD, (1 << 3));
-		return;
+		break;
 	}
 	case A3XX_INT_RBBM_REG_TIMEOUT:
-		err = "RBBM: AHB register timeout";
+		KGSL_DRV_CRIT_RATELIMIT(device, "RBBM: AHB register timeout\n");
 		break;
 	case A3XX_INT_RBBM_ME_MS_TIMEOUT:
-		err = "RBBM: ME master split timeout";
+		KGSL_DRV_CRIT_RATELIMIT(device,
+			"RBBM: ME master split timeout\n");
 		break;
 	case A3XX_INT_RBBM_PFP_MS_TIMEOUT:
-		err = "RBBM: PFP master split timeout";
+		KGSL_DRV_CRIT_RATELIMIT(device,
+			"RBBM: PFP master split timeout\n");
 		break;
 	case A3XX_INT_RBBM_ATB_BUS_OVERFLOW:
-		err = "RBBM: ATB bus oveflow";
+		KGSL_DRV_CRIT_RATELIMIT(device,
+			"RBBM: ATB bus oveflow\n");
 		break;
 	case A3XX_INT_VFD_ERROR:
-		err = "VFD: Out of bounds access";
+		KGSL_DRV_CRIT_RATELIMIT(device,
+			"VFD: Out of bounds access\n");
 		break;
 	case A3XX_INT_CP_T0_PACKET_IN_IB:
-		err = "ringbuffer TO packet in IB interrupt";
+		KGSL_DRV_CRIT_RATELIMIT(device,
+			"ringbuffer TO packet in IB interrupt\n");
 		break;
 	case A3XX_INT_CP_OPCODE_ERROR:
-		err = "ringbuffer opcode error interrupt";
+		KGSL_DRV_CRIT_RATELIMIT(device,
+			"ringbuffer opcode error interrupt\n");
 		break;
 	case A3XX_INT_CP_RESERVED_BIT_ERROR:
-		err = "ringbuffer reserved bit error interrupt";
+		KGSL_DRV_CRIT_RATELIMIT(device,
+				"ringbuffer reserved bit error interrupt\n");
 		break;
-	case A3XX_INT_CP_HW_FAULT:
-		err = "ringbuffer hardware fault";
+	case A3XX_INT_CP_HW_FAULT: {
+		unsigned int reg;
+		adreno_readreg(adreno_dev, ADRENO_REG_CP_HW_FAULT, &reg);
+		KGSL_DRV_CRIT_RATELIMIT(device,
+			"CP | Ringbuffer HW fault | status=%x\n", reg);
 		break;
+	}
 	case A3XX_INT_CP_REG_PROTECT_FAULT: {
 		unsigned int reg;
 		kgsl_regread(device, A3XX_CP_PROTECT_STATUS, &reg);
@@ -697,17 +708,16 @@ static void a3xx_err_callback(struct adreno_device *adreno_dev, int bit)
 			"CP | Protected mode error| %s | addr=%x\n",
 			reg & (1 << 24) ? "WRITE" : "READ",
 			(reg & 0x1FFFF) >> 2);
+		break;
 	}
 	case A3XX_INT_CP_AHB_ERROR_HALT:
-		err = "ringbuffer AHB error interrupt";
+		KGSL_DRV_CRIT(device, "ringbuffer AHB error interrupt\n");
 		break;
 	case A3XX_INT_UCHE_OOB_ACCESS:
-		err = "UCHE:  Out of bounds access";
+		KGSL_DRV_CRIT_RATELIMIT(device,
+			"UCHE:  Out of bounds access\n");
 		break;
-	default:
-		return;
 	}
-	KGSL_DRV_CRIT(device, "%s\n", err);
 }
 
 static void a3xx_cp_callback(struct adreno_device *adreno_dev, int irq)
@@ -1798,9 +1808,12 @@ static void a3xx_start(struct adreno_device *adreno_dev)
 
 	/* Turn on hang detection - this spews a lot of useful information
 	 * into the RBBM registers on a hang */
-
-	kgsl_regwrite(device, A3XX_RBBM_INTERFACE_HANG_INT_CTL,
-			(1 << 16) | 0xFFF);
+	if (adreno_is_a330v2(adreno_dev))
+		kgsl_regwrite(device, A3XX_RBBM_INTERFACE_HANG_INT_CTL,
+				(1 << 31) | 0xFFFF);
+	else
+		kgsl_regwrite(device, A3XX_RBBM_INTERFACE_HANG_INT_CTL,
+				(1 << 16) | 0xFFF);
 
 	/* Enable 64-byte cacheline size. HW Default is 32-byte (0x000000E0). */
 	kgsl_regwrite(device, A3XX_UCHE_CACHE_MODE_CONTROL_REG, 0x00000001);
@@ -1984,6 +1997,7 @@ static unsigned int a3xx_register_offsets[ADRENO_REG_REGISTER_MAX] = {
 	ADRENO_REG_DEFINE(ADRENO_REG_CP_TIMESTAMP, A3XX_CP_SCRATCH_REG0),
 	ADRENO_REG_DEFINE(ADRENO_REG_SCRATCH_ADDR, A3XX_CP_SCRATCH_ADDR),
 	ADRENO_REG_DEFINE(ADRENO_REG_SCRATCH_UMSK, A3XX_CP_SCRATCH_UMSK),
+	ADRENO_REG_DEFINE(ADRENO_REG_CP_HW_FAULT, A3XX_CP_HW_FAULT),
 	ADRENO_REG_DEFINE(ADRENO_REG_RBBM_STATUS, A3XX_RBBM_STATUS),
 	ADRENO_REG_DEFINE(ADRENO_REG_RBBM_PERFCTR_CTL, A3XX_RBBM_PERFCTR_CTL),
 	ADRENO_REG_DEFINE(ADRENO_REG_RBBM_PERFCTR_LOAD_CMD0,

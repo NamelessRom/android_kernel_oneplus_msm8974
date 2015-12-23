@@ -572,7 +572,10 @@ static struct cpu_workqueue_struct *get_work_cwq(struct work_struct *work)
 	if (data & WORK_STRUCT_CWQ)
 		return (void *)(data & WORK_STRUCT_WQ_DATA_MASK);
 	else
+	{
+		WARN_ON_ONCE(1);
 		return NULL;
+	}
 }
 
 static struct global_cwq *get_work_gcwq(struct work_struct *work)
@@ -1093,7 +1096,8 @@ static void delayed_work_timer_fn(unsigned long __data)
 	struct delayed_work *dwork = (struct delayed_work *)__data;
 	struct cpu_workqueue_struct *cwq = get_work_cwq(&dwork->work);
 
-	__queue_work(smp_processor_id(), cwq->wq, &dwork->work);
+	if (cwq != NULL)
+		__queue_work(smp_processor_id(), cwq->wq, &dwork->work);
 }
 
 /**
@@ -1385,12 +1389,12 @@ static struct worker *create_worker(struct worker_pool *pool, bool bind)
 	/*
 	 * A rogue worker will become a regular one if CPU comes
 	 * online later on.  Make sure every worker has
-	 * PF_THREAD_BOUND set.
+	 * PF_NO_SETAFFINITY set.
 	 */
 	if (bind && !on_unbound_cpu)
 		kthread_bind(worker->task, gcwq->cpu);
 	else {
-		worker->task->flags |= PF_THREAD_BOUND;
+		worker->task->flags |= PF_NO_SETAFFINITY;
 		if (on_unbound_cpu)
 			worker->flags |= WORKER_UNBOUND;
 	}
@@ -3035,7 +3039,7 @@ struct workqueue_struct *__alloc_workqueue_key(const char *fmt,
 		if (IS_ERR(rescuer->task))
 			goto err;
 
-		rescuer->task->flags |= PF_THREAD_BOUND;
+		rescuer->task->flags |= PF_NO_SETAFFINITY;
 		wake_up_process(rescuer->task);
 	}
 
