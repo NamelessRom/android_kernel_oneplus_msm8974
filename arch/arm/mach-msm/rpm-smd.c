@@ -17,6 +17,7 @@
 #include <linux/bug.h>
 #include <linux/completion.h>
 #include <linux/delay.h>
+#include <linux/err.h>
 #include <linux/init.h>
 #include <linux/interrupt.h>
 #include <linux/io.h>
