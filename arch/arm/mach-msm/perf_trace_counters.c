@@ -11,6 +11,7 @@
  */
 #include <asm/thread_notify.h>
 #include <linux/uaccess.h>
+#include <linux/cpu.h>
 #include <linux/debugfs.h>
 #define CREATE_TRACE_POINTS
 #include "perf_trace_counters.h"
