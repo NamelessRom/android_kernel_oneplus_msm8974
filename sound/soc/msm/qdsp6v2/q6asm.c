@@ -361,6 +361,10 @@ static void config_debug_fs_init(void)
 {
 	return;
 }
+static int q6asm_mmap_apr_dereg(void)
+{
+	return 0;
+}
 #endif
 
 
